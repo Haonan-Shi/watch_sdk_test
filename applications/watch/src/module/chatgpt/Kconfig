@@ -1,0 +1,16 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "chatgpt module config"
+
+	config CHATGPT
+		bool "chatgpt support"
+		default n
+		depends on OPUS
+	help
+		This option enables the chatgpt.
+	
+endmenu

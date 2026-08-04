@@ -1,0 +1,91 @@
+/*
+ * Copyright (c) 2026, Realtek Semiconductor Corporation
+ *
+ * SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+ */
+
+/*
+ * SPI master + WiFi-AT-over-SPI + SPI/TCP throughput snippet overlay.
+ *
+ * Enabled via the wifi_8711 snippet (pairs with wifi_8711.conf):
+ *   west build -b rtl87x3g_watch/rtl8773gtp applications/watch -p \
+ *     -S honeygui -S honeygui_screen_410_502 -S wifi_8711
+ *
+ * Use only through the wifi_8711 snippet; do not stack onto release builds.
+ *
+ * The SPI bus runs on the high-speed SPI1 controller (spi1_hs) using the
+ * dedicated P4_2..P4_5 pads, which are otherwise unused on the watch board.
+ * M2S shares a pad with LCD_AVDD_EN (P2_3), which is unreferenced in app
+ * source, so M2S reclaims that pad. S2M uses the P2_4/GPIOA19 pad, which is
+ * otherwise unused on the watch board.
+ * The handshake and SPI1 pins are defined as macros in the board.h.
+ *
+ *   M2S handshake : P2_3 (GPIOA18)   - master -> slave attention
+ *   S2M handshake : P2_4 (GPIOA19)   - slave  -> master attention (IRQ in)
+ *   SPI1 SCK      : P4_2             - high-speed SPI1 (spi1_hs) controller
+ *   SPI1 MISO     : P4_3
+ *   SPI1 MOSI     : P4_4
+ *   SPI1 CS       : P4_5             - hardware SS_N (controller-driven)
+ *
+ * Board note: the psram0 buffer region below uses rtl8773gtp addresses
+ * (psram0 = 0x22000000..0x22400000). Apply this snippet on rtl8773gtp.
+ */
+
+#include <zephyr/dt-bindings/gpio/realtek-rtl87x3g-gpio.h>
+#include <zephyr/dt-bindings/pinctrl/rtl87x3g-pinctrl.h>
+
+/* SPI sync GPIOs - consumed by app_spi_master_zephyr.c via
+ * DT_NODELABEL(wifi_8711_resources). The node is named after this snippet
+ * (rather than a generic "resources") so it does not collide/merge with a
+ * "resources" node contributed by another stacked -S overlay. */
+/ {
+    wifi_8711_resources: wifi_8711_resources {
+        compatible = "spi_m2s2m-gpio";
+        m2s-gpios = < PIN_M2S_GPIO GPIO_ACTIVE_LOW >;   /* P2_3 */
+        s2m-gpios = < PIN_S2M_GPIO GPIO_ACTIVE_HIGH >;  /* P2_4 */
+    };
+};
+
+/* SPI master - high-speed SPI1 (spi1_hs) controller, hardware CS (SS_N) */
+&spi1_hs {
+    status = "okay";
+    pinctrl-0 = <&spi_pinmux>;
+    pinctrl-names = "default";
+
+    /* SPI1 GDMA handshakes: TX = 6, RX = 7 */
+    dmas = <&dma0 0 6 0x16c21>, <&dma0 1 7 0x6c0a>; /* tx, rx */
+    dma-names = "tx", "rx";
+    rx-sample-delay = <1>;
+
+    /* "wifi_8711_device" is a DEVICE node label (the peer on this bus), not an
+     * SPI0 controller - the controller is spi1_hs above. Named after the
+     * wifi_8711 snippet so it does not collide with an spi0_device node from
+     * another stacked -S overlay; app_spi_master_zephyr.c (shared with
+     * bt_audio_trx's wifi_8711 copy) binds via DT_NODELABEL(wifi_8711_device). */
+    wifi_8711_device: wifi_8711_device@0 {
+        compatible = "wifi_8711-device";
+        reg = <0>;
+        spi-max-frequency = <4000000>;
+        status = "okay";
+    };
+};
+
+&pinctrl {
+    spi_pinmux: spi_pinmux {
+        group1 {
+            psels = <RTL87X3G_PSEL(HS_P4_2_SPI1_CLK,  PIN_SPI1_CLK,  DIR_OUT, DRV_HIGH, PULL_UP)>,
+                    <RTL87X3G_PSEL(HS_P4_3_SPI1_MISO, PIN_SPI1_MISO, DIR_OUT, DRV_HIGH, PULL_UP)>,
+                    <RTL87X3G_PSEL(HS_P4_4_SPI1_MOSI, PIN_SPI1_MOSI, DIR_OUT, DRV_HIGH, PULL_UP)>,
+                    <RTL87X3G_PSEL(HS_P4_5_SPI1_CSN,  PIN_SPI1_CSN,  DIR_OUT, DRV_HIGH, PULL_UP)>;
+        };
+    };
+};
+
+&dma0 {
+    status = "okay";
+};
+
+/* The SPI master DMA buffers (tx_ring/tx_dma/rx_storage) and the SPI-TCP blast
+ * staging frame live in the shared non-cacheable psram1_nc region (last 1M of
+ * psram1, MPU region 5), via SECTION_PSRAM1_NC - see psram_section.h. No
+ * dedicated psram0 buffer node is needed. */

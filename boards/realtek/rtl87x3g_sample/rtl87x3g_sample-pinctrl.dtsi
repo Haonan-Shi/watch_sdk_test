@@ -1,0 +1,26 @@
+/*
+ * Copyright (c) 2026, Realtek Semiconductor Corporation
+ *
+ * SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+ */
+#include <dt-bindings/pinctrl/rtl87x3g-pinctrl.h>
+
+&pinctrl
+{
+	uart2_default:uart2_default {
+		group1 {
+			psels = <RTL87X3G_PSEL(UART2_TX, P3_1, DIR_OUT, DRV_HIGH, PULL_UP)>,
+			<RTL87X3G_PSEL(UART2_RX, P3_0, DIR_IN, DRV_HIGH, PULL_UP)>;
+		};
+	};
+
+	uart2_sleep:uart2_sleep {
+		group1 {
+			psels = <RTL87X3G_PSEL(SW_MODE, P3_1, DIR_OUT, DRV_HIGH, PULL_UP)>;
+		};
+		group2 {
+			psels = <RTL87X3G_PSEL(SW_MODE, P3_0, DIR_IN, DRV_HIGH, PULL_UP)>;
+			wakeup-low;
+		};
+	};
+};

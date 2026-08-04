@@ -1,0 +1,20 @@
+/*
+ * Copyright(c) 2024, Realtek Semiconductor Corporation.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <zephyr/dt-bindings/gpio/realtek-rtl87x3g-gpio.h>
+#include <dt-bindings/pinctrl/rtl87x3g-pinctrl.h>
+#include <rtl87x3g-display-lcd.dtsi>
+
+&display_lcd {
+	status = "okay";
+};
+
+
+/ {
+    chosen {
+        zephyr,display = &display_lcd;
+    };
+};

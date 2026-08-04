@@ -1,0 +1,25 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+config AIRSYNC_SERVICE_SUPPORT
+	bool "AirSync Service"
+	default n
+	help
+	  Enable AirSync GATT service (supports both BLE and BR/EDR).
+
+config AIRSYNC_SERVICE_NUM
+	int "Airsync Service"
+	default 1 if AIRSYNC_SERVICE_SUPPORT
+	default 0
+	help
+	  This option configs airsync service.
+
+config AIRSYNC_GATT_OVER_BREDR
+	bool "AirSync GATT over BR/EDR support"
+	depends on AIRSYNC_SERVICE_SUPPORT && GATT_OVER_BREDR
+	default n
+	help
+	  This option enables AirSync over GATT over BR/EDR transport.

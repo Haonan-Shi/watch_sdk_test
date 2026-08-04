@@ -1,0 +1,126 @@
+/*
+ * Copyright (c) 2026, Realtek Semiconductor Corporation
+ *
+ * SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+ */
+/dts-v1/;
+#include <realtek/rtl87x3g.dtsi>
+#include "rtl87x3g_sample-pinctrl.dtsi"
+/ {
+	model = "Realtek rtl87x3g evb";
+	compatible = "realtek,rtl87x3g_sample";
+	chosen {
+		zephyr,sram = &dtcm;
+		zephyr,itcm = &itcm;
+		zephyr,flash = &flash;
+		zephyr,code-partition = &bank0_app_partition;
+/* By default, rtl87x3g uses RTK-LOG-UART(uart1) to output zephyr log.
+ * Therefore, zephyr,console and zephyr,shell-uart should be NULL to save resources.
+ */
+		// zephyr,console = &uart2;
+		// zephyr,shell-uart = &uart2;
+		zephyr,flash-controller = &fmc;
+	};
+	/* These aliases are used by soc.c */
+	aliases {
+		ftl-region = &ftl_region;
+		ftl-region-storage-base = &flash;
+		vp-data = &bank0_ext_img0;
+		vp-data-storage-base = &flash;
+		bt-host = &bt_host;
+		bt-host-storage-base = &flash;
+	};
+};
+
+&flash
+{
+	reg = <0x70000000 DT_SIZE_K(4096)>;
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		reserved: partition@0 {
+			label = "reserved-image";
+			reg = <0x0 DT_SIZE_K(8)>;
+		};
+		config_file: partition@2000 {
+			label = "config-file-image";
+			reg = <0x2000 DT_SIZE_K(4)>;
+		};
+		boot_patch_0: partition@4000 {
+			label = "boot-patch-0-image";
+			reg = <0x4000 DT_SIZE_K(12)>;
+		};
+		boot_patch_1: partition@7000 {
+			label = "boot-patch-1-image";
+			reg = <0x7000 DT_SIZE_K(12)>;
+		};
+		bt_host: partition@a000 {
+			label = "bt_host";
+			reg = <0xA000 DT_SIZE_K(252)>;
+		};
+		bank0_ota_header: partition@49000 {
+			label = "ota-header-image";
+			reg = <0x49000 DT_SIZE_K(1)>;
+		};
+		bank0_stack_patch: partition@4a000 {
+			label = "stack-patch-image";
+			reg = <0x4A000 DT_SIZE_K(200)>;
+		};
+		bank0_system_patch: partition@7c000 {
+			label = "system-patch-image";
+			reg = <0x7c000 DT_SIZE_K(22)>;
+		};
+		bank0_app_partition: partition@9e000 {
+			label = "app-image";
+			reg = <0x9E000 DT_SIZE_K(1536)>;
+		};
+		bank0_dsp_sys: partition@21e000 {
+			label = "bank0_dsp_sys-image";
+			reg = <0x21E000 DT_SIZE_K(632)>;
+		};
+		bank0_dsp_app: partition@2bc000 {
+			label = "bank0_dsp_app-image";
+			reg = <0x2BC000 DT_SIZE_K(256)>;
+		};
+		bank0_dsp_cfg: partition@2fc000 {
+			label = "bank0_dsp_cfg-image";
+			reg = <0x2FC000 DT_SIZE_K(40)>;
+		};
+		bank0_app_cfg: partition@306000 {
+			label = "bank0_app_cfg-image";
+			reg = <0x306000 DT_SIZE_K(8)>;
+		};
+		bank0_ext_img0: partition@308000 {
+			label = "bank0_ext_img0-image";
+			reg = <0x308000 DT_SIZE_K(200)>;
+		};
+
+		/*bank1: todo*/
+
+		// storage_partition: partition@fc000 {
+		// 	label = "storage";
+		// 	reg = <0xFC000 DT_SIZE_K(16)>;
+		// };
+
+		ftl_region: partition@33a000 {
+			label = "realtek-ftl-region";
+			reg = <0x33A000 DT_SIZE_K(32)>; 
+		};
+	};
+};
+
+&cpu {
+	clock-frequency = <40000000>;
+};
+
+&uart2 {
+	pinctrl-0 = <&uart2_default>;
+	pinctrl-1 = <&uart2_sleep>;
+	pinctrl-names = "default", "sleep";
+	status = "disabled";
+	current-speed = <2000000>;
+	parity = "none";
+	stop-bits = "1";
+	data-bits = <8>;
+};

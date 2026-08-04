@@ -1,0 +1,21 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+# This loads watch source code config
+menu "Realtek Watch Application"
+rsource "src/Kconfig"
+endmenu
+
+config APP_NANDBOOT
+    bool "Compile app code with NANDBOOT support"
+	default n
+    select REALTEK_LIBS_NANDBOOT if y
+    help
+        Compile app code with NANDBOOT support.
+
+menu "Zephyr Kernel"
+source "Kconfig.zephyr"
+endmenu

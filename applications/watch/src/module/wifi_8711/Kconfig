@@ -1,0 +1,46 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "WIFI 8711 (AT-over-SPI) module config"
+	config WIFI_8711
+		bool "WiFi 8711 AT-over-SPI support"
+		default n
+	help
+		This option enables the WiFi 8711 AT-over-SPI module: the SPI master
+		driver toward the 8711 WiFi AT slave chip, the AT-over-SPI command
+		engine and the SPI/TCP throughput test. Enabled by the wifi_8711 snippet
+		(applications/watch/snippets/wifi_8711), which also supplies the
+		wifi_8711_device / wifi_8711_resources devicetree nodes the SPI
+		master binds to.
+
+	config WIFI_8711_ROLE_MASTER
+		bool "WiFi 8711 SPI master role"
+		depends on WIFI_8711
+		default y
+	help
+		Build the SPI master side (drives the 8711 slave over SPI DMA). This is
+		the only role the watch supports; keep it enabled.
+
+	config WIFI_8711_ROLE_SLAVE
+		bool "WiFi 8711 SPI slave role"
+		depends on WIFI_8711
+		default n
+	help
+		Build the SPI slave side. No slave implementation exists on the watch,
+		so this stays disabled.
+
+	config WIFI_8711_TEST
+		bool "WiFi 8711 shell test commands"
+		depends on WIFI_8711 && SHELL
+		default n
+	help
+		Register the `wifi8711` shell command group (SPI role init, AT WLCONN /
+		WLDISCONN, and the SPI+TCP throughput test) so the flows previously
+		triggered by host commands in app_cmd.c can be driven from a UART
+		console. Replaces the CMD_SPI_INIT / CMD_AT_CMD_WLCONN /
+		CMD_SPI_TCP_TP_TEST handling.
+
+endmenu

@@ -1,0 +1,42 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+# This loads watch source code config
+
+menu "Realtek Watch Application HUB Select"
+	
+	config HUB_CHARGER
+		bool "hub charger"
+		default n
+	help
+		This option enables the charger.
+	
+	config HUB_CLOCK
+		bool "hub clock"
+		default y
+	help
+		This option enables the clock.
+		
+	config HUB_GSENSOR
+		bool "hub gsensor"
+		default n
+		select GSENSOR_STK8321
+	help
+		This option enables the gsensor.
+	
+	config HUB_HRS
+		bool "hub hrs"
+		default n
+		select RTK_PPG
+	help
+		This option enables the hrs.
+	
+	config HUB_USB
+		bool "hub usb"
+		default n
+	help
+		This option enables the usb.
+endmenu

@@ -1,0 +1,44 @@
+/*
+ * Copyright (c) 2026, Realtek Semiconductor Corporation
+ *
+ * SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+ */
+
+#ifndef __WIFI_PROGRAM_H__
+#define __WIFI_PROGRAM_H__
+
+#include "rtl876x.h"
+
+typedef enum
+{
+    STATUS_OK                = 0x00,
+    STATUS_GET_PROPERTY_FAIL = 0x01,
+    STATUS_SET_PROPERTY_FAIL = 0x02,
+    STATUS_CRC16_CHECK_ERROR,
+    STATUS_RECV_TIMEOUT,
+    STATUS_SPIC_SELECT_FAIL,
+    STATUS_BLOCK64_ERASE_FAIL,
+    STATUS_FLASH_READ_FAIL,
+    STATUS_FLASH_INIT_FAIL,
+    STATUS_EFLASH_VERIFY_FAIL,
+    STATUS_EFUSE_WRITE_FAIL,
+    STATUS_EFUSE_READ_FAIL,
+    STATUS_LOAD_RAM_PATCH_FAIL,
+    STATUS_RUN_MP_LOADER_FAIL,
+    STATUS_SET_BAUDRATE_FAIL = 0x11,
+
+    STATUS_READ_MEMORY_FAIL  = 0x21,
+    STATUS_WRITE_MEMORY_FAIL = 0x22,
+
+    STATUS_PAGE_ERASE_FAIL   = 0x31,
+    STATUS_CHIP_ERASE_FAIL   = 0x32,
+    STATUS_PROGRAM_FAIL      = 0x33,
+
+    STATUS_GO_FAIL           = 0x41,
+    STATUS_REBOOT_FAIL       = 0x42,
+    STATUS_BLINK_FAIL        = 0x43,
+} WIFI_PROGRAM_STATUS;
+
+bool app_z2_download(void);
+
+#endif //__WIFI_PROGRAM_H__

@@ -1,0 +1,28 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+config EVENT_BUS
+	bool "App event bus module (pub/sub)"
+	default y
+	help
+	  This option enables the event_bus module which provides
+	  a lightweight publish/subscribe mechanism for event
+	  communication between modules.
+
+config EVENT_BUS_LOG
+	bool "App event bus log enable"
+	depends on EVENT_BUS && LOG
+	default y
+	help
+	  Enable Zephyr logging for the event_bus module.
+
+if EVENT_BUS_LOG
+
+module = EVENT_BUS
+module-str = event_bus
+source "subsys/logging/Kconfig.template.log_config"
+
+endif

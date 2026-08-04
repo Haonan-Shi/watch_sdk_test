@@ -1,0 +1,56 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "Shell App Test Scenarios"
+
+    config SHELL_APP
+        bool "root config of the shell app test scenarios"
+        default n
+        help
+           Root config of the zephyr-shell app test scenarios under
+           src/shell_app. Enable it plus the per-scenario options below
+           (usually via the "shell" snippet).
+
+
+    config SHELL_APP_A2DP_SRC
+        bool "A2DP source play-music shell test module"
+        depends on SHELL_APP && SHELL
+        default n
+        help
+          Shell-driven A2DP-source test: scan / connect a headphone / play
+          local music (MP3 if present, else synthetic SBC) / stop, via the
+          `a2dp_src` shell command. Decoupled test module; event_bus for coupling.
+
+    config SHELL_APP_WIFI_BASIC
+        bool "WiFi basic shell test module"
+        depends on SHELL_APP && SHELL && WIFI
+        default n
+        help
+          Shell-driven WiFi test: enter / connect AP (SSID+password) /
+          uplink throughput (ATWT client) / downlink throughput (ATWT server),
+          via the `wifi` shell command. Decoupled via event_bus.
+
+
+    config SHELL_APP_DLPS
+        bool "DLPS power-consumption shell test module"
+        depends on SHELL_APP && SHELL && PM
+        default n
+        help
+          Shell-driven DLPS power test: enter (BT off, DLPS mode on) /
+          40m / 100m / 200m CPU frequency cycles / stop / status.
+          Each test cycle: CPU active 500 us, sleep 65.5 ms (66 ms period).
+
+    config SHELL_APP_BLE_THROUGHPUT
+        bool "BLE throughput monitor shell module"
+        depends on SHELL_APP && SHELL
+        default n
+        help
+          Read-only shell front-end for the Phone-driven LE throughput GATT
+          service in src/app. Subscribes to pushed test snapshots via event_bus
+          and exposes `ble_throughput` commands: enter / exit / status / report / link /
+          monitor / reset, plus `stop` (the only control) to abort a test.
+
+endmenu

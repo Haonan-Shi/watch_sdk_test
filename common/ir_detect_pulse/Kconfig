@@ -1,0 +1,13 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "Realtek Common Module Ir Detect Pulse"
+config REALTEK_COMMON_MODULE_IR_DETECT_PULSE
+    bool "Enable Realtek Common Module Ir Detect Pulse"
+    default n
+    help
+        Realtek common module ir detect pulse support.
+endmenu

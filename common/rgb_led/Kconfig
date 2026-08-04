@@ -1,0 +1,13 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "Realtek Common Module RGB LED"
+config REALTEK_COMMON_MODULE_RGB_LED
+    bool "Enable Realtek Common Module RGB LED"
+    default n
+    help
+        Realtek common module RGB LED support.
+endmenu

@@ -1,0 +1,13 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "Realtek Common Module Sw Keyscan"
+config REALTEK_COMMON_MODULE_SW_KEYSCAN
+    bool "Enable Realtek Common Module Sw Keyscan"
+    default n
+    help
+        Realtek common module sw keyscan support.
+endmenu

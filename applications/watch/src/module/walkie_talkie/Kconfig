@@ -1,0 +1,29 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "walkie talkie module config"
+
+	config WALKIE_TALKIE
+		bool "walkie talkie support"
+		default n
+	help
+		This option enables the walkie talkie.
+	
+	config WALKIE_TALKIE_SERVICES
+		int "walkie talkie services"
+		default 1 if WALKIE_TALKIE
+		default 0
+	help
+		This option configs walkie talkie services.
+
+	config WALKIE_TALKIE_BLE_LINKS
+		int "walkie talkie ble links"
+		default 2 if WALKIE_TALKIE
+		default 0
+	help
+		This option configs walkie talkie ble links.
+	
+endmenu

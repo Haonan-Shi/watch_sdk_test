@@ -1,0 +1,17 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+config LOCAL_PLAYBACK
+	bool "local playback support"
+	help
+	  This option enables the local playback.
+
+config PLAYBACK_GATT_OVER_BREDR
+	bool "local playback GATT over BR/EDR support"
+	depends on LOCAL_PLAYBACK && GATT_OVER_BREDR
+	help
+	  This option enables GATT over BR/EDR transport for local playback.
+	  When enabled, playback service will use BR/EDR instead of LE for data transfer.

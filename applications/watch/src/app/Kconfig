@@ -1,0 +1,35 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "Realtek Watch Application Select"
+	config SC_KEY_DERIVE
+		bool "one-click connection"
+		default n
+		help
+		  SC = Secure Connection. When enabled, after a successful BLE connection, a security key will be automatically derived and the BT connection will be initiated.
+
+	config GATT_OVER_BREDR
+		bool "GATT over BR/EDR support"
+		default n
+		help
+		  Enable GATT service over classic Bluetooth (BR/EDR) transport.
+
+	config WECHAT_CALL_ON_PHONE_OUTPUT_ONLY
+		bool "Disable WeChat call audio output on watch"
+		default n
+		help
+		  If enabled, WeChat call audio will not be played on the watch.
+	config PHONEBOOK_SYNC_SUPPORT
+		bool "Enable phonebook sync"
+		default n
+		help
+		  Enable synchronization of phonebook data via PBAP.
+	config BLE_DEFAULT_LINKS
+		int "ble default links"
+		default 1
+	help
+		This option configs ble default links.
+endmenu

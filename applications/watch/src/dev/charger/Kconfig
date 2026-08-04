@@ -1,0 +1,19 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+config INTERNAL_CHARGER
+	bool "Enable internal charger"
+	default n
+	depends on HUB_CHARGER
+help
+	This config for enable internal charger
+	
+config CJ4056_CHARGER
+	bool "Enable cj4056 charger"
+	default n
+	depends on HUB_CHARGER
+help
+	This config for enable cj4056 charger
