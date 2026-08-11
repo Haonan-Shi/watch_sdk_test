@@ -1,0 +1,44 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "gfps module config"
+
+	config REALTEK_GFPS_FEATURE_SUPPORT
+		bool "gfps support"
+		default n
+		select REALTEK_SUBSYS_GFPS
+	help
+		This option enables the gpfs.
+	
+	config REALTEK_GFPS_FINDER_SUPPORT
+		bool "gfps finder support"
+		default y if REALTEK_GFPS_FEATURE_SUPPORT
+		default n
+	help
+		This option configs gfps finder function.
+
+	config REALTEK_GFPS_LE_DEVICE_SUPPORT
+		bool "gfps le device support"
+		default y if REALTEK_GFPS_FEATURE_SUPPORT
+		default n
+	help
+		This option enables gfps le device.
+
+	config REALTEK_GFPS_SERVICES
+		int "gfps services"
+		default 2 if REALTEK_GFPS_FEATURE_SUPPORT
+		default 0
+	help
+		This option configs gfps services.
+	
+	config REALTEK_GFPS_MAX_LINKS
+		int "gfps services"
+		default 2 if REALTEK_GFPS_FEATURE_SUPPORT
+		default 0
+	help
+		This option configs gfps links.
+	
+endmenu

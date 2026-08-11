@@ -1,0 +1,11 @@
+# Load arch Kconfig descriptions.
+osource "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/arch/x86/Kconfig"
+osource "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/arch/xtensa/Kconfig"
+osource "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/arch/sparc/Kconfig"
+osource "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/arch/riscv/Kconfig"
+osource "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/arch/posix/Kconfig"
+osource "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/arch/nios2/Kconfig"
+osource "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/arch/mips/Kconfig"
+osource "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/arch/arm64/Kconfig"
+osource "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/arch/arm/Kconfig"
+osource "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/arch/arc/Kconfig"

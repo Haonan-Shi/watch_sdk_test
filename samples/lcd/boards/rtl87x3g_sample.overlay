@@ -1,0 +1,49 @@
+/*
+ * Copyright(c) 2024, Realtek Semiconductor Corporation.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <zephyr/dt-bindings/gpio/realtek-rtl87x3g-gpio.h>
+#include <zephyr/dt-bindings/pinctrl/rtl87x3g-pinctrl.h>
+#include <rtl87x3g-display-lcd.dtsi>
+
+&gpioa {
+	status = "okay";
+};
+
+&pinctrl {
+	i2c1_default: i2c1_default {
+		group1 {
+			psels = <RTL87X3G_PSEL(I2C1_CLK, ADC_0, DIR_OUT, DRV_HIGH, PULL_UP)>,
+			<RTL87X3G_PSEL(I2C1_DAT, ADC_1, DIR_OUT, DRV_HIGH, PULL_UP)>;
+		};
+	};
+};
+
+&display_lcd {
+	status = "okay";
+};
+
+
+/ {
+    chosen {
+        zephyr,display = &display_lcd;
+    };
+};
+
+&i2c1 {
+	pinctrl-0 = <&i2c1_default>;
+	pinctrl-names = "default";
+	status = "okay";
+	clock-frequency = <400000>;
+	touch_device: touch_chsc6417@2e {
+		compatible = "chipsemi,chsc6417";
+		reg = <0x2E>;
+		irq-gpios = <&gpioa 2  GPIO_ACTIVE_HIGH>;
+		rst-gpios = <&gpioa 3 GPIO_ACTIVE_HIGH>;
+		gesture-release-timeout-ms = <30>;
+		status = "okay";
+	};
+};
+

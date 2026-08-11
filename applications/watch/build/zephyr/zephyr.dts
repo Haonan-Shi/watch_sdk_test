@@ -1,0 +1,712 @@
+/dts-v1/;
+
+/ {
+	#address-cells = < 0x1 >;
+	#size-cells = < 0x1 >;
+	model = "Realtek rtl8773gtp Watch";
+	compatible = "realtek,rtl87x3g_watch_rtl8773gtp";
+	chosen {
+		zephyr,entropy = &trng;
+		zephyr,sram = &dtcm;
+		zephyr,itcm = &itcm;
+		zephyr,flash = &flash;
+		zephyr,code-partition = &bank0_app_partition;
+		zephyr,flash-controller = &fmc;
+		zephyr,display = &display_lcd;
+	};
+	aliases {
+		ftl-region = &ftl_region;
+		ftl-region-storage-base = &flash;
+		vp-data = &bank0_ext_img0;
+		vp-data-storage-base = &flash;
+		bt-host = &bt_host;
+		bt-host-storage-base = &flash;
+		qdec0 = &qdec;
+		dma-0 = &dma0;
+		rtc = &rtc;
+		sdhc0 = &sdhc0;
+		ext-amp = &ext_amp;
+	};
+	soc {
+		#address-cells = < 0x1 >;
+		#size-cells = < 0x1 >;
+		compatible = "simple-bus";
+		interrupt-parent = < &nvic >;
+		ranges;
+		nvic: interrupt-controller@e000e100 {
+			#address-cells = < 0x1 >;
+			compatible = "arm,v8.1m-nvic";
+			reg = < 0xe000e100 0xc00 >;
+			interrupt-controller;
+			#interrupt-cells = < 0x2 >;
+			arm,num-irq-priority-bits = < 0x3 >;
+			phandle = < 0x1 >;
+		};
+		systick: timer@e000e010 {
+			compatible = "arm,armv8.1m-systick";
+			reg = < 0xe000e010 0x10 >;
+		};
+		fmc: flash-controller@40022000 {
+			compatible = "realtek,rtl87x3g-nor-flash-controller";
+			reg = < 0x40022000 0x400 >;
+			#address-cells = < 0x1 >;
+			#size-cells = < 0x1 >;
+			status = "okay";
+			flash: flash@70000000 {
+				compatible = "soc-nv-flash";
+				write-block-size = < 0x1 >;
+				erase-block-size = < 0x1000 >;
+				reg = < 0x70000000 0x1000000 >;
+				partitions: partitions {
+					compatible = "fixed-partitions";
+					#address-cells = < 0x1 >;
+					#size-cells = < 0x1 >;
+					reserved: partition@0 {
+						label = "reserved-image";
+						reg = < 0x0 0x2000 >;
+					};
+					config_file: partition@2000 {
+						label = "config-file-image";
+						reg = < 0x2000 0x1000 >;
+					};
+					boot_patch_0: partition@4000 {
+						label = "boot-patch-0-image";
+						reg = < 0x4000 0x3000 >;
+					};
+					boot_patch_1: partition@7000 {
+						label = "boot-patch-1-image";
+						reg = < 0x7000 0x3000 >;
+					};
+					bt_host: partition@a000 {
+						label = "bt_host";
+						reg = < 0xa000 0x3f000 >;
+					};
+					bank0_ota_header: partition@49000 {
+						label = "ota-header-image";
+						reg = < 0x49000 0x400 >;
+					};
+					bank0_stack_patch: partition@4a000 {
+						label = "stack-patch-image";
+						reg = < 0x4a000 0x32000 >;
+					};
+					bank0_system_patch: partition@7c000 {
+						label = "system-patch-image";
+						reg = < 0x7c000 0x5800 >;
+					};
+					bank0_app_partition: partition@9e000 {
+						label = "app-image";
+						reg = < 0x9e000 0x180000 >;
+					};
+					bank0_dsp_sys: partition@21e000 {
+						label = "bank0_dsp_sys-image";
+						reg = < 0x21e000 0x9e000 >;
+					};
+					bank0_dsp_app: partition@2bc000 {
+						label = "bank0_dsp_app-image";
+						reg = < 0x2bc000 0x40000 >;
+					};
+					bank0_dsp_cfg: partition@2fc000 {
+						label = "bank0_dsp_cfg-image";
+						reg = < 0x2fc000 0xa000 >;
+					};
+					bank0_app_cfg: partition@306000 {
+						label = "bank0_app_cfg-image";
+						reg = < 0x306000 0x2000 >;
+					};
+					bank0_ext_img0: partition@308000 {
+						label = "bank0_ext_img0-image";
+						reg = < 0x308000 0x32000 >;
+					};
+					ftl_region: partition@33a000 {
+						label = "realtek-ftl-region";
+						reg = < 0x33a000 0x8000 >;
+					};
+					partition_userdata1: partition@4d1000 {
+						label = "realtek-userdata1";
+						reg = < 0x4d1000 0x600000 >;
+						phandle = < 0x2 >;
+						flash_disk0: flash_disk0 {
+							compatible = "zephyr,flash-disk";
+							partition = < &partition_userdata1 >;
+							disk-name = "NOR";
+							cache-size = < 0x1000 >;
+							sector-size = < 0x200 >;
+							status = "disabled";
+						};
+					};
+					partition_userdata2: partition@ad1000 {
+						label = "realtek-userdata2";
+						reg = < 0xad1000 0x500000 >;
+						read-only;
+						phandle = < 0x3 >;
+						flash_disk1: flash_disk1 {
+							compatible = "zephyr,flash-disk";
+							partition = < &partition_userdata2 >;
+							disk-name = "ROMFS";
+							cache-size = < 0x0 >;
+							sector-size = < 0x200 >;
+							status = "disabled";
+						};
+					};
+				};
+			};
+		};
+		trace: memory@e0640000 {
+			compatible = "zephyr,memory-region";
+			reg = < 0xe0640000 0x400000 >;
+			zephyr,memory-region = "TRACE";
+		};
+		rcu: reset-clock-controller@40000200 {
+			compatible = "realtek,rtl87x3g-rcu";
+			reg = < 0x40000200 0x400 >;
+			status = "okay";
+			cctl: clock-controller {
+				compatible = "realtek,rtl87x3g-cctl";
+				#clock-cells = < 0x1 >;
+				status = "okay";
+				phandle = < 0x4 >;
+			};
+		};
+		pinctrl: pin-controller@40000500 {
+			compatible = "realtek,rtl87x3g-pinctrl";
+			#address-cells = < 0x1 >;
+			#size-cells = < 0x1 >;
+			reg = < 0x40000500 0x864 >;
+			gpioa: gpio@40001000 {
+				compatible = "realtek,rtl87x3g-gpio";
+				gpio-controller;
+				#gpio-cells = < 0x2 >;
+				reg = < 0x40001000 0x64 >;
+				clocks = < &cctl 0x31 >;
+				port = < 0x0 >;
+				interrupts = < 0x12 0x0 >, < 0x13 0x0 >, < 0x14 0x0 >, < 0x15 0x0 >, < 0x16 0x0 >, < 0x17 0x0 >;
+				status = "okay";
+				phandle = < 0x9 >;
+			};
+			gpiob: gpio@40004800 {
+				compatible = "realtek,rtl87x3g-gpio";
+				gpio-controller;
+				#gpio-cells = < 0x2 >;
+				reg = < 0x40004800 0x64 >;
+				clocks = < &cctl 0x30 >;
+				port = < 0x1 >;
+				interrupts = < 0x25 0x0 >, < 0x26 0x0 >, < 0x27 0x0 >, < 0x28 0x0 >;
+				status = "okay";
+			};
+			uart2_default: uart2_default {
+				phandle = < 0x5 >;
+				group1 {
+					psels = < 0x1d6817 >, < 0x1e281b >;
+				};
+			};
+			uart2_sleep: uart2_sleep {
+				phandle = < 0x6 >;
+				group1 {
+					psels = < 0x1046817 >;
+				};
+				group2 {
+					psels = < 0x104281b >;
+					wakeup-low;
+				};
+			};
+			sdhc0_default: sdhc0_default {
+				phandle = < 0xa >;
+				group1 {
+					psels = < 0x1886824 >, < 0x1886825 >, < 0x1886826 >;
+					bias-pull-strong;
+				};
+			};
+			sdhc0_sleep: sdhc0_sleep {
+				phandle = < 0xb >;
+				group1 {
+					psels = < 0x1040024 >, < 0x1040025 >, < 0x1040026 >;
+				};
+			};
+			i2c1_default: i2c1_default {
+				phandle = < 0x7 >;
+				group1 {
+					psels = < 0x77000 >, < 0x87001 >;
+				};
+			};
+			i2c1_sleep: i2c1_sleep {
+				phandle = < 0x8 >;
+				group1 {
+					psels = < 0x1040800 >, < 0x1040801 >;
+				};
+			};
+		};
+		uart0: serial@40011000 {
+			compatible = "realtek,rtl87x3g-uart";
+			reg = < 0x40011000 0x60 >;
+			clocks = < &cctl 0x15 >;
+			interrupts = < 0xe 0x0 >;
+			status = "disabled";
+		};
+		uart2: serial@40012400 {
+			compatible = "realtek,rtl87x3g-uart";
+			reg = < 0x40012400 0x60 >;
+			clocks = < &cctl 0x13 >;
+			interrupts = < 0x10 0x0 >;
+			status = "disabled";
+			pinctrl-0 = < &uart2_default >;
+			pinctrl-1 = < &uart2_sleep >;
+			pinctrl-names = "default", "sleep";
+			current-speed = < 0x1e8480 >;
+			parity = "none";
+			stop-bits = "1";
+			data-bits = < 0x8 >;
+		};
+		uart3: serial@40012800 {
+			compatible = "realtek,rtl87x3g-uart";
+			reg = < 0x40012800 0x60 >;
+			clocks = < &cctl 0x12 >;
+			interrupts = < 0x2f 0x0 >;
+			status = "disabled";
+		};
+		uart4: serial@40012c00 {
+			compatible = "realtek,rtl87x3g-uart";
+			reg = < 0x40012c00 0x60 >;
+			clocks = < &cctl 0x11 >;
+			interrupts = < 0x30 0x0 >;
+			status = "disabled";
+		};
+		uart5: serial@40024000 {
+			compatible = "realtek,rtl87x3g-uart";
+			reg = < 0x40024000 0x60 >;
+			clocks = < &cctl 0x10 >;
+			interrupts = < 0x31 0x0 >;
+			status = "disabled";
+		};
+		dma0: dma@400952c0 {
+			compatible = "realtek,rtl87x3g-dma";
+			reg = < 0x400952c0 0x6c0 >;
+			interrupts = < 0x41 0x0 >, < 0x42 0x0 >, < 0x70 0x0 >, < 0x71 0x0 >, < 0x72 0x0 >, < 0x73 0x0 >;
+			dma-channels = < 0x6 >;
+			clocks = < &cctl 0xf >;
+			dma-port = < 0x0 >;
+			#dma-cells = < 0x3 >;
+			status = "okay";
+		};
+		sleep_led: sleep_led@40000600 {
+			compatible = "realtek,rtl87x3g-led";
+			reg = < 0x40000600 0x88 >;
+			status = "disabled";
+		};
+		timer4: timer@40025140 {
+			compatible = "realtek,rtl87x3g-timer";
+			reg = < 0x40025140 0x50 >;
+			interrupts = < 0x36 0x0 >;
+			channels = < 0x0 >;
+			clocks = < &cctl 0x8 >;
+			status = "disabled";
+			port = < 0x1 >;
+			channel = < 0x4 >;
+			case = < 0x7 >;
+			pwm4 {
+				compatible = "realtek,rtl87x3g-pwm";
+				status = "disabled";
+				#pwm-cells = < 0x3 >;
+			};
+		};
+		timer5: timer@40025190 {
+			compatible = "realtek,rtl87x3g-timer";
+			reg = < 0x40025190 0x50 >;
+			interrupts = < 0x37 0x0 >;
+			channels = < 0x0 >;
+			clocks = < &cctl 0x8 >;
+			status = "disabled";
+			port = < 0x1 >;
+			channel = < 0x5 >;
+			case = < 0x7 >;
+			pwm5 {
+				compatible = "realtek,rtl87x3g-pwm";
+				status = "disabled";
+				#pwm-cells = < 0x3 >;
+			};
+		};
+		timer6: timer@400251e0 {
+			compatible = "realtek,rtl87x3g-timer";
+			reg = < 0x400251e0 0x50 >;
+			interrupts = < 0x47 0x0 >;
+			channels = < 0x0 >;
+			clocks = < &cctl 0x8 >;
+			status = "disabled";
+			port = < 0x1 >;
+			channel = < 0x6 >;
+			case = < 0x3 >;
+			pwm6 {
+				compatible = "realtek,rtl87x3g-pwm";
+				status = "disabled";
+				#pwm-cells = < 0x3 >;
+			};
+		};
+		timer7: timer@40025230 {
+			compatible = "realtek,rtl87x3g-timer";
+			reg = < 0x40025230 0x50 >;
+			interrupts = < 0x48 0x0 >;
+			channels = < 0x0 >;
+			clocks = < &cctl 0x8 >;
+			status = "disabled";
+			port = < 0x1 >;
+			channel = < 0x7 >;
+			case = < 0x3 >;
+			pwm7 {
+				compatible = "realtek,rtl87x3g-pwm";
+				status = "disabled";
+				#pwm-cells = < 0x3 >;
+			};
+		};
+		timer8: timer@40025280 {
+			compatible = "realtek,rtl87x3g-timer";
+			reg = < 0x40025280 0x50 >;
+			interrupts = < 0x49 0x0 >;
+			channels = < 0x0 >;
+			clocks = < &cctl 0x8 >;
+			status = "disabled";
+			port = < 0x1 >;
+			channel = < 0x8 >;
+			case = < 0x3 >;
+			pwm8 {
+				compatible = "realtek,rtl87x3g-pwm";
+				status = "disabled";
+				#pwm-cells = < 0x3 >;
+			};
+		};
+		spi0: spi@40013000 {
+			compatible = "realtek,rtl87x3g-spi";
+			reg = < 0x40013000 0xf0 >;
+			interrupts = < 0x5 0x0 >;
+			clocks = < &cctl 0x2a >;
+			status = "disabled";
+			#address-cells = < 0x1 >;
+			#size-cells = < 0x0 >;
+			max-bus-freq = < 0x1312d00 >;
+		};
+		spi0_slave: spi_slave@40015c00 {
+			compatible = "realtek,rtl87x3g-spi";
+			reg = < 0x40015c00 0xf0 >;
+			interrupts = < 0x67 0x0 >;
+			clocks = < &cctl 0x21 >;
+			status = "disabled";
+			#address-cells = < 0x1 >;
+			#size-cells = < 0x0 >;
+			is-slave;
+		};
+		spi1: spi@40019000 {
+			compatible = "realtek,rtl87x3g-spi";
+			reg = < 0x40019000 0xf0 >;
+			interrupts = < 0x29 0x0 >;
+			clocks = < &cctl 0x29 >;
+			status = "disabled";
+			#address-cells = < 0x1 >;
+			#size-cells = < 0x0 >;
+			max-bus-freq = < 0x1312d00 >;
+		};
+		spi1_hs: spi@40070000 {
+			compatible = "realtek,rtl87x3g-spi";
+			reg = < 0x40070000 0xf0 >;
+			interrupts = < 0x29 0x0 >;
+			clocks = < &cctl 0x29 >;
+			status = "disabled";
+			#address-cells = < 0x1 >;
+			#size-cells = < 0x0 >;
+			max-bus-freq = < 0x2faf080 >;
+		};
+		spi2: spi@40016000 {
+			compatible = "realtek,rtl87x3g-spi";
+			reg = < 0x40016000 0xf0 >;
+			interrupts = < 0x2a 0x0 >;
+			clocks = < &cctl 0x27 >;
+			status = "disabled";
+			#address-cells = < 0x1 >;
+			#size-cells = < 0x0 >;
+			max-bus-freq = < 0x1312d00 >;
+		};
+		i2c0: i2c@40015000 {
+			compatible = "realtek,rtl87x3g-i2c";
+			reg = < 0x40015000 0xa4 >;
+			clock-frequency = < 0x186a0 >;
+			#address-cells = < 0x1 >;
+			#size-cells = < 0x0 >;
+			interrupts = < 0x6 0x0 >;
+			clocks = < &cctl 0x26 >;
+			status = "disabled";
+		};
+		i2c1: i2c@40015400 {
+			compatible = "realtek,rtl87x3g-i2c";
+			reg = < 0x40015400 0xa4 >;
+			clock-frequency = < 0x61a80 >;
+			#address-cells = < 0x1 >;
+			#size-cells = < 0x0 >;
+			interrupts = < 0x2b 0x0 >;
+			clocks = < &cctl 0x25 >;
+			status = "okay";
+			pinctrl-0 = < &i2c1_default >;
+			pinctrl-1 = < &i2c1_sleep >;
+			pinctrl-names = "default", "sleep";
+			touch_device: touch_chsc6417@2e {
+				compatible = "chipsemi,chsc6417";
+				reg = < 0x2e >;
+				irq-gpios = < &gpioa 0x2 0x0 >;
+				rst-gpios = < &gpioa 0x3 0x0 >;
+				gesture-release-timeout-ms = < 0x1e >;
+				status = "okay";
+			};
+		};
+		i2c2: i2c@40015800 {
+			compatible = "realtek,rtl87x3g-i2c";
+			reg = < 0x40015800 0xa4 >;
+			clock-frequency = < 0x186a0 >;
+			#address-cells = < 0x1 >;
+			#size-cells = < 0x0 >;
+			interrupts = < 0x2c 0x0 >;
+			clocks = < &cctl 0x22 >;
+			status = "disabled";
+		};
+		qdec: qdec@40004000 {
+			compatible = "realtek,rtl87x3g-qdec";
+			reg = < 0x40004000 0x30 >;
+			interrupts = < 0x2e 0x0 >;
+			clocks = < &cctl 0x24 >;
+			status = "disabled";
+		};
+		rtc: rtc@40000100 {
+			compatible = "realtek,rtl87x3g-rtc";
+			reg = < 0x40000100 0x40 >;
+			interrupts = < 0xd 0x0 >;
+			channels = < 0x1 >;
+			alarms-count = < 0x4 >;
+			status = "okay";
+			prescaler = < 0x1 >;
+		};
+		input_kscan: input_kscan@40004400 {
+			compatible = "realtek,rtl87x3g-input-kscan";
+			reg = < 0x40004400 0x44 >;
+			interrupts = < 0x2d 0x0 >;
+			clocks = < &cctl 0x23 >;
+			max-row-size = < 0xc >;
+			max-col-size = < 0x14 >;
+			status = "disabled";
+		};
+		zephyr_udc0: udc@40100000 {
+			compatible = "realtek,rtl87x3g-udc", "snps,dwc2";
+			reg = < 0x40100000 0x40000 >, < 0x40100000 0x40000 >;
+			reg-names = "wrapper", "core";
+			interrupts = < 0x51 0x0 >;
+			num-in-eps = < 0x6 >;
+			num-out-eps = < 0x6 >;
+			ghwcfg1 = < 0x0 >;
+			ghwcfg2 = < 0x22abfc72 >;
+			ghwcfg4 = < 0x1e10aa60 >;
+			status = "disabled";
+		};
+		sdhc0: sdhc@40060000 {
+			compatible = "realtek,rtl87x3g-sdhc";
+			reg = < 0x40060000 0x200 >;
+			interrupts = < 0x3c 0x0 >;
+			clocks = < &cctl 0xe >;
+			#address-cells = < 0x1 >;
+			#size-cells = < 0x0 >;
+			max-bus-freq = < 0x2625a00 >;
+			min-bus-freq = < 0x9c40 >;
+			status = "okay";
+			pin-group = < 0x0 >;
+			bus-width = < 0x1 >;
+			pwr-gpios = < &gpioa 0x6 0x0 >;
+			pinctrl-0 = < &sdhc0_default >;
+			pinctrl-1 = < &sdhc0_sleep >;
+			pinctrl-names = "default", "sleep";
+			sdcard_disk0: sdcard_disk0 {
+				compatible = "zephyr,sdmmc-disk";
+				status = "okay";
+			};
+		};
+		sdhc1: sdhc@40062000 {
+			compatible = "realtek,rtl87x3g-sdhc";
+			reg = < 0x40062000 0x200 >;
+			interrupts = < 0x6d 0x0 >;
+			clocks = < &cctl 0x1b >;
+			#address-cells = < 0x1 >;
+			#size-cells = < 0x0 >;
+			max-bus-freq = < 0x2faf080 >;
+			min-bus-freq = < 0x9c40 >;
+			status = "disabled";
+		};
+		adc: adc@40010000 {
+			compatible = "realtek,rtl87x3g-adc";
+			reg = < 0x40010000 0x60 >;
+			interrupts = < 0x12 0x0 >;
+			clocks = < &cctl 0x32 >;
+			channels = < 0x8 >;
+			status = "disabled";
+			#io-channel-cells = < 0x1 >;
+		};
+		trng: trng@400c2400 {
+			compatible = "realtek,bee-trng";
+			reg = < 0x400c2400 0x68 >;
+			status = "okay";
+		};
+	};
+	cpus {
+		#address-cells = < 0x1 >;
+		#size-cells = < 0x0 >;
+		cpu: cpu@0 {
+			device_type = "cpu";
+			compatible = "arm,cortex-m55";
+			reg = < 0x0 >;
+			#address-cells = < 0x1 >;
+			#size-cells = < 0x1 >;
+			clock-frequency = < 0x2625a00 >;
+		};
+	};
+	rom {
+		#address-cells = < 0x1 >;
+		#size-cells = < 0x1 >;
+		boot_rom: memory@0 {
+			device_type = "boot rom region";
+			reg = < 0x0 0x37000 >;
+		};
+		stack_rom: memory@37000 {
+			device_type = "stack rom region";
+			reg = < 0x37000 0x81000 >;
+		};
+	};
+	internal_ram {
+		#address-cells = < 0x1 >;
+		#size-cells = < 0x1 >;
+		internal_itcm: memory@b8000 {
+			device_type = "internal itcm region";
+			reg = < 0xb8000 0x8c00 >;
+		};
+		internal_dtcm: memory@20000000 {
+			device_type = "internal dtcm region";
+			reg = < 0x20000000 0xb800 >;
+		};
+	};
+	itcm {
+		#address-cells = < 0x1 >;
+		#size-cells = < 0x1 >;
+		itcm: memory@c0c00 {
+			device_type = "itcm region";
+			compatible = "zephyr,memory-region", "arm,itcm";
+			zephyr,memory-region = "ITCM";
+			reg = < 0xc0c00 0x6c00 >;
+		};
+		heap_itcm: memory@c7800 {
+			device_type = "heap itcm region";
+			reg = < 0xc7800 0x10800 >;
+		};
+	};
+	dtcm {
+		#address-cells = < 0x1 >;
+		#size-cells = < 0x1 >;
+		dtcm: memory@2000b800 {
+			device_type = "dtcm region";
+			reg = < 0x2000b800 0x14400 >;
+		};
+		heap_dtcm: memory@2001fc00 {
+			device_type = "heap dtcm region";
+			reg = < 0x2001fc00 0x400 >;
+		};
+	};
+	sram {
+		#address-cells = < 0x1 >;
+		#size-cells = < 0x1 >;
+		sram: memory@20020000 {
+			device_type = "sram region";
+			compatible = "zephyr,memory-region", "mmio-sram";
+			reg = < 0x20020000 0x1a000 >;
+			zephyr,memory-region = "SRAM";
+		};
+		heap_sram: memory@2003A000 {
+			device_type = "heap sram region";
+			reg = < 0x2003a000 0xe000 >;
+		};
+	};
+	dsp_ram {
+		#address-cells = < 0x1 >;
+		#size-cells = < 0x1 >;
+		dsp_share_ram: memory@20048000 {
+			compatible = "zephyr,memory-region";
+			device_type = "dsp_share_ram region";
+			zephyr,memory-region = "DSPRAM";
+			reg = < 0x20048000 0x14000 >;
+		};
+	};
+	buffer_ram {
+		#address-cells = < 0x1 >;
+		#size-cells = < 0x1 >;
+		lowstack_global: memory@20400000 {
+			device_type = "lowstack global region";
+			reg = < 0x20400000 0x800 >;
+		};
+		heap_buffer_ram: memory@20400800 {
+			device_type = "heap buffer_ram region";
+			reg = < 0x20400800 0xf800 >;
+		};
+	};
+	psram0: psram0 {
+		#address-cells = < 0x1 >;
+		#size-cells = < 0x1 >;
+		psram0_for_mcu: memory@22000000 {
+			compatible = "zephyr,memory-region";
+			reg = < 0x22000000 0x400000 >;
+			zephyr,memory-region = "PSRAM0_MCU";
+		};
+	};
+	psram1: psram1 {
+		#address-cells = < 0x1 >;
+		#size-cells = < 0x1 >;
+		psram1_for_dsp: memory@24000000 {
+			compatible = "zephyr,memory-region";
+			reg = < 0x24000000 0x80000 >;
+			zephyr,memory-region = "PSRAM1_DSP";
+		};
+		psram1_for_mcu: memory@24080000 {
+			compatible = "zephyr,memory-region";
+			reg = < 0x24080000 0x280000 >;
+			zephyr,memory-region = "PSRAM1_MCU";
+		};
+		psram1_nc: memory@24300000 {
+			compatible = "zephyr,memory-region";
+			reg = < 0x24300000 0x100000 >;
+			zephyr,memory-region = "PSRAM1_NC";
+		};
+	};
+	gpio_keys: gpio_keys {
+		compatible = "realtek,gpio-keys";
+		debounce-interval-ms = < 0x1e >;
+		key1: key1 {
+			gpios = < &gpioa 0x17 0x91 >;
+			label = "key1";
+			key,id = < 0x64 >;
+			status = "okay";
+		};
+		key2: key2 {
+			gpios = < &gpioa 0x0 0x11 >;
+			label = "key2";
+			key,id = < 0x65 >;
+			status = "disabled";
+		};
+		key3: key3 {
+			gpios = < &gpioa 0x18 0x11 >;
+			label = "key3";
+			key,id = < 0x66 >;
+			status = "disabled";
+		};
+	};
+	gpio_output {
+		compatible = "gpio-leds";
+		ext_amp: ext_amp {
+			gpios = < &gpioa 0x14 0x0 >;
+			label = "ext amp control pin";
+		};
+	};
+	display_lcd: display@8000000 {
+		compatible = "realtek,rtl87x3g-display-lcd";
+		reg = < 0x8000000 0x80000 >;
+		width = < 0x1e0 >;
+		height = < 0x110 >;
+		status = "okay";
+	};
+};

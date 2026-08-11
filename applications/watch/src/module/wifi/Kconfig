@@ -1,0 +1,49 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "WIFI module config"
+	config WIFI
+		bool "WIFI support"
+		default n
+	help
+		This option enables the WIFI.
+
+	config WIFI_CAMERA
+		depends on WIFI
+		bool "WIFI Camera support"
+		default n
+	help
+	  	This option enables the WIFI Camera.
+
+	config WIFI_RTSP
+		bool "wifi rtsp support"
+		depends on WIFI_CAMERA
+		default y
+	help
+	  	This option enables the mjpeg rtsp protocol.
+
+	config WIFI_JPEG_PARSER
+		bool "jpeg parser support"
+		depends on WIFI_CAMERA
+		default n
+	help
+	  	This option enables the mjpeg parser for http protocol.
+
+	config WIFI_AUDIO_PLAYER
+		bool "wifi audio player support"
+		depends on WIFI_RTSP
+		default n
+	help
+	  	This option enables the wifi audio player for wifi camera.
+
+	config WIFI_AUDIO_RECORDER
+		bool "wifi audio recorder support"
+		depends on WIFI_CAMERA
+		default n
+	help
+	  	This option enables the wifi audio recorder for wifi camera.
+
+endmenu

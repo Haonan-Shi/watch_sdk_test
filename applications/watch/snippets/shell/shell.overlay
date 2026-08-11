@@ -1,0 +1,46 @@
+/*
+ * Copyright (c) 2026, Realtek Semiconductor Corporation
+ *
+ * SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+ */
+
+/ {
+    chosen {
+        zephyr,console = &uart2;
+        zephyr,shell-uart = &uart2;
+    };
+};
+
+&uart2 {
+    status = "okay";
+    current-speed = <921600>;
+};
+
+&uart2_default {
+    group1 {
+        psels = <RTL87X3G_PSEL(UART2_TX, UART2_TX_PIN, DIR_OUT, DRV_HIGH, PULL_UP)>,
+        <RTL87X3G_PSEL(UART2_RX, UART2_RX_PIN, DIR_IN, DRV_HIGH, PULL_UP)>;
+    };
+};
+
+&uart2_sleep {
+    group1 {
+        psels = <RTL87X3G_PSEL(SW_MODE, UART2_TX_PIN, DIR_OUT, DRV_HIGH, PULL_UP)>;
+    };
+    group2 {
+        psels = <RTL87X3G_PSEL(SW_MODE, UART2_RX_PIN, DIR_IN, DRV_HIGH, PULL_UP)>;
+        wakeup-low;
+    };
+};
+
+/*
+ * NOT a peripheral disable: this only widens the always-on RTC to a second
+ * comparator channel. The `dlps` test needs an RTC-comparator wake because in
+ * DLPS the HW/system timers stop, so k_sleep can never wake the CPU and the
+ * test would hang. Channel 0 is the calendar clock; exposing channel 1 lets the
+ * driver's shared ISR service the DLPS wake. Without this, `dlps 40m/100m/200m`
+ * lock up. (Everything else here only configures the shell/console UART.)
+ */
+&rtc {
+    channels = <2>;
+};

@@ -1,0 +1,206 @@
+/*
+ * Copyright (c) 2026, Realtek Semiconductor Corporation
+ *
+ * SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+ */
+
+/**
+ * app_cycle_tracking UI Definition (Auto-generated, do not modify manually)
+ * Generated at: 2026-04-02T09:54:52.740Z
+ */
+#ifndef APP_CYCLE_TRACKING_UI_H
+#define APP_CYCLE_TRACKING_UI_H
+
+#include "guidef.h"
+#include "gui_obj.h"
+#include "gui_components_init.h"
+#include "gui_view.h"
+#include "gui_view_instance.h"
+#include "gui_win.h"
+#include "draw_font.h"
+#include "font_types.h"
+#include "gui_list.h"
+#include "gui_rect.h"
+#include "gui_circle.h"
+#include "gui_text.h"
+#include "gui_img.h"
+
+// Component handle declarations
+extern gui_list_t *cycle_track_list;
+extern gui_rounded_rect_t *cycle_track_record0;
+extern gui_rounded_rect_t *cycle_track_record1;
+extern gui_rounded_rect_t *cycle_track_record2;
+extern gui_rounded_rect_t *cycle_track_record3;
+extern gui_circle_t *cycle_track_record_mark0;
+extern gui_rounded_rect_t *cycle_track_record4;
+extern gui_circle_t *cycle_track_record_mark1;
+extern gui_rounded_rect_t *cycle_track_record5;
+extern gui_circle_t *cycle_track_record_mark2;
+extern gui_rounded_rect_t *cycle_track_record6;
+extern gui_circle_t *cycle_track_record_mark3;
+extern gui_text_t *hg_label_1769761165740_60hx;
+extern gui_rounded_rect_t *hg_rect_1769761365236_appj;
+extern gui_text_t *Light_Flow_and_Acne_text;
+extern gui_win_t *app_cycle_tracking_window;
+extern gui_img_t *hg_image_1769761296861_2c5p;
+extern gui_text_t *app_cycle_tracking_time_text;
+extern gui_list_t *cycle_tracking_record_list;
+extern gui_rounded_rect_t *cycle_tracking_record_list0_bg;
+extern gui_img_t *cycle_tracking_record0;
+extern gui_text_t *cycle_tracking_Menstruation_text;
+extern gui_rounded_rect_t *cycle_tracking_record_list1_bg;
+extern gui_img_t *cycle_tracking_record_add1;
+extern gui_text_t *cycle_tracking_Symptom_text;
+extern gui_rounded_rect_t *cycle_tracking_record_list2_bg;
+extern gui_img_t *cycle_tracking_record_add2;
+extern gui_text_t *Spotting_text;
+extern gui_win_t *cycle_tracking_re_window;
+extern gui_text_t *cycle_tracking_record_time_text;
+extern gui_img_t *cycle_tracking_record_back_icon_bg;
+extern gui_img_t *hg_image_1769761721084_fcvl;
+extern gui_list_t *cycle_tracking_menstruation_list;
+extern gui_text_t *cycle_tracking_mens_TEXT;
+extern gui_rounded_rect_t *cycle_tracking_mens_list1_bg;
+extern gui_text_t *cycle_tracking_mens_sym_text;
+extern gui_rounded_rect_t *cycle_tracking_mens_list2_bg;
+extern gui_text_t *symptomcycle_tracking_mens_sym_text;
+extern gui_text_t *Blood_loss_text;
+extern gui_rounded_rect_t *cycle_tracking_mens_list5_bg;
+extern gui_text_t *Small_Quantity_text;
+extern gui_rounded_rect_t *cycle_tracking_mens_list6_bg;
+extern gui_text_t *Medium_Quantity_text;
+extern gui_rounded_rect_t *cycle_tracking_mens_list7_bg;
+extern gui_text_t *Quantity_Large_text;
+extern gui_win_t *cycle_menstruation_window;
+extern gui_text_t *cycle_tracking_record_time_text_copy_1769762411269_1;
+extern gui_img_t *hg_image_1769762439225_63oo;
+extern gui_list_t *hg_list_1769763676513_n1s4;
+extern gui_text_t *hg_label_1769765239790_eu1e;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg2;
+extern gui_obj_t *hg_button_1769763824621_71z7_copy_1769763944802;
+extern gui_text_t *button_Bladder_Incontinence;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg3;
+extern gui_obj_t *hg_button_Constipation;
+extern gui_text_t *Constipation_text;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg4;
+extern gui_obj_t *hg_button_Hot_Flash;
+extern gui_text_t *HotFlash_text;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg5;
+extern gui_obj_t *hg_button_Acne;
+extern gui_text_t *Acne_text;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg6;
+extern gui_obj_t *hg_button_HairLoss;
+extern gui_text_t
+*hg_label_1769765239790_eu1e_copy_1769765328854_copy_1769765388662_copy_1769765452543_copy_1769765509712_copy_1769765520649;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg7;
+extern gui_obj_t *bg_button_Nausea;
+extern gui_text_t
+*hg_label_1769765239790_eu1e_copy_1769765328854_copy_1769765388662_copy_1769765452543_copy_1769765509712_copy_1769765520649_copy_1769765527527;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg8;
+extern gui_obj_t *hg_button_FeelCold;
+extern gui_text_t
+*hg_label_1769765239790_eu1e_copy_1769765328854_copy_1769765388662_copy_1769765452543_copy_1769765509712_copy_1769765520649_copy_1769765527527_copy_1769765539415;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg9;
+extern gui_obj_t *hg_button_AbdominalColic;
+extern gui_text_t
+*hg_label_1769765239790_eu1e_copy_1769765328854_copy_1769765388662_copy_1769765452543_copy_1769765509712_copy_1769765520649_copy_1769765527527_copy_1769765539415_copy_1769765544766;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg10;
+extern gui_obj_t *hg_button_Diarrhea;
+extern gui_text_t
+*hg_label_1769765239790_eu1e_copy_1769765328854_copy_1769765388662_copy_1769765452543_copy_1769765509712_copy_1769765520649_copy_1769765527527_copy_1769765539415_copy_1769765544766_copy_1769765551608;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg10_copy_1769765685129;
+extern gui_obj_t *hg_button_AbdominalDistension;
+extern gui_text_t
+*hg_label_1769765239790_eu1e_copy_1769765328854_copy_1769765388662_copy_1769765452543_copy_1769765509712_copy_1769765520649_copy_1769765527527_copy_1769765539415_copy_1769765544766_copy_1769765551608_copy_1769765557497;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg12;
+extern gui_obj_t *hg_button_MemoryDecline;
+extern gui_text_t
+*hg_label_1769765239790_eu1e_copy_1769765328854_copy_1769765388662_copy_1769765452543_copy_1769765509712_copy_1769765520649_copy_1769765527527_copy_1769765539415_copy_1769765544766_copy_1769765551608_copy_1769765583944;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg13;
+extern gui_obj_t *hg_button_PelvicPain;
+extern gui_text_t
+*hg_label_1769765239790_eu1e_copy_1769765328854_copy_1769765388662_copy_1769765452543_copy_1769765509712_copy_1769765520649_copy_1769765527527_copy_1769765539415_copy_1769765544766_copy_1769765551608_copy_1769765583944_copy_1769765701817;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg14;
+extern gui_obj_t *hg_button_DrySkin;
+extern gui_text_t
+*hg_label_1769765239790_eu1e_copy_1769765328854_copy_1769765388662_copy_1769765452543_copy_1769765509712_copy_1769765520649_copy_1769765527527_copy_1769765539415_copy_1769765544766_copy_1769765551608_copy_1769765583944_copy_1769765701817_copy_1769765710016;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg15;
+extern gui_obj_t *hg_button_Fatigue;
+extern gui_text_t
+*hg_label_1769765239790_eu1e_copy_1769765328854_copy_1769765388662_copy_1769765452543_copy_1769765509712_copy_1769765520649_copy_1769765527527_copy_1769765539415_copy_1769765544766_copy_1769765551608_copy_1769765583944_copy_1769765701817_copy_1769765710016_copy_1769765719544;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg16;
+extern gui_obj_t *hg_button_BreastPain;
+extern gui_text_t
+*hg_label_1769765239790_eu1e_copy_1769765328854_copy_1769765388662_copy_1769765452543_copy_1769765509712_copy_1769765520649_copy_1769765527527_copy_1769765539415_copy_1769765544766_copy_1769765551608_copy_1769765583944_copy_1769765701817_copy_1769765710016_copy_1769765719544_copy_1769765725528;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg17;
+extern gui_obj_t *hg_button_ChangesAppetite;
+extern gui_text_t *ChangesAppetite_text;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg18;
+extern gui_obj_t *hg_button_SleepChanges;
+extern gui_text_t *SleepChanges_text;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg19;
+extern gui_obj_t *hg_button_Headache;
+extern gui_text_t *Headache_text;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg20;
+extern gui_obj_t *hg_button_LowerBackPain;
+extern gui_text_t *LowerBackPain_text;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg21;
+extern gui_obj_t *hg_button_MoodChanges;
+extern gui_text_t *MoodChanges_text;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg22;
+extern gui_obj_t *hg_button_SweatingNight;
+extern gui_text_t *SweatingNight_text;
+extern gui_rounded_rect_t *cycle_tracking_symptom_list_bg23;
+extern gui_obj_t *hg_button_VaginalDryness;
+extern gui_text_t *VaginalDryness_text;
+extern gui_win_t *cycle_tracking_symptom_window;
+extern gui_text_t *cycle_tracking_symptom_time_text;
+extern gui_img_t *hg_image_1769763659121_in3z;
+
+// Toggle button state management function declarations
+extern bool hg_button_1769763824621_71z7_copy_1769763944802_get_state(void);
+extern void hg_button_1769763824621_71z7_copy_1769763944802_set_state(bool state);
+extern bool hg_button_Constipation_get_state(void);
+extern void hg_button_Constipation_set_state(bool state);
+extern bool hg_button_Hot_Flash_get_state(void);
+extern void hg_button_Hot_Flash_set_state(bool state);
+extern bool hg_button_Acne_get_state(void);
+extern void hg_button_Acne_set_state(bool state);
+extern bool hg_button_HairLoss_get_state(void);
+extern void hg_button_HairLoss_set_state(bool state);
+extern bool bg_button_Nausea_get_state(void);
+extern void bg_button_Nausea_set_state(bool state);
+extern bool hg_button_FeelCold_get_state(void);
+extern void hg_button_FeelCold_set_state(bool state);
+extern bool hg_button_AbdominalColic_get_state(void);
+extern void hg_button_AbdominalColic_set_state(bool state);
+extern bool hg_button_Diarrhea_get_state(void);
+extern void hg_button_Diarrhea_set_state(bool state);
+extern bool hg_button_AbdominalDistension_get_state(void);
+extern void hg_button_AbdominalDistension_set_state(bool state);
+extern bool hg_button_MemoryDecline_get_state(void);
+extern void hg_button_MemoryDecline_set_state(bool state);
+extern bool hg_button_PelvicPain_get_state(void);
+extern void hg_button_PelvicPain_set_state(bool state);
+extern bool hg_button_DrySkin_get_state(void);
+extern void hg_button_DrySkin_set_state(bool state);
+extern bool hg_button_Fatigue_get_state(void);
+extern void hg_button_Fatigue_set_state(bool state);
+extern bool hg_button_BreastPain_get_state(void);
+extern void hg_button_BreastPain_set_state(bool state);
+extern bool hg_button_ChangesAppetite_get_state(void);
+extern void hg_button_ChangesAppetite_set_state(bool state);
+extern bool hg_button_SleepChanges_get_state(void);
+extern void hg_button_SleepChanges_set_state(bool state);
+extern bool hg_button_Headache_get_state(void);
+extern void hg_button_Headache_set_state(bool state);
+extern bool hg_button_LowerBackPain_get_state(void);
+extern void hg_button_LowerBackPain_set_state(bool state);
+extern bool hg_button_MoodChanges_get_state(void);
+extern void hg_button_MoodChanges_set_state(bool state);
+extern bool hg_button_SweatingNight_get_state(void);
+extern void hg_button_SweatingNight_set_state(bool state);
+extern bool hg_button_VaginalDryness_get_state(void);
+extern void hg_button_VaginalDryness_set_state(bool state);
+
+#endif // APP_CYCLE_TRACKING_UI_H

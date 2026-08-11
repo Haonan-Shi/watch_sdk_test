@@ -1,0 +1,11 @@
+# Copyright(c) 2024, Realtek Semiconductor Corporation.
+
+menu "cywee motion algorithm"
+
+	config CYWEE_MOTION_ALGORITHM
+		bool "cywee motion algorithm support"
+		default n
+		help
+		  This option enables the cywee motion algorithm.
+		  
+endmenu

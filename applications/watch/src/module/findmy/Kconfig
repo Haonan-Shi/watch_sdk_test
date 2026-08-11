@@ -1,0 +1,44 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "Findmy module config"
+	config FINDMY
+		bool "findmy support"
+		depends on REALTEK_SUBSYS_MBEDTLS
+		depends on REALTEK_SUBSYS_GATT_PROFILE_TPS_SERVER
+		default n
+	help
+		This option enables the findmy.
+
+	config FINDMY_MAX_LINKS
+		int "findmy max links"
+		default 1 if FINDMY
+		default 0
+	help
+		This option configs findmy links.
+
+	config FINDMY_SERVICES
+		int "findmy max services"
+		default 3 if FINDMY
+		default 0
+	help
+		This option configs findmy services.
+
+	config FINDMY_USE_UARP
+		bool "findmy uarp support"
+		depends on FINDMY
+		default n
+	help
+		This option enables the findmy uarp.
+	
+	config FINDMY_USE_NFC
+		bool "findmy nfc support"
+		depends on FINDMY
+		default n
+	help
+		This option enables the findmy nfc.
+	
+endmenu

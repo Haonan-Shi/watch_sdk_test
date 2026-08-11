@@ -1,0 +1,9 @@
+# Release binaries live in a GitHub Release asset
+
+This directory is intentionally kept (almost) empty in git.
+Its contents are published as a single archive in the GitHub Release.
+See `assets.yaml` at the repository root: it lists every archive's download URL
+and sha256.
+
+Fastest way to restore it: run `python fetch_assets.py` at the repository root —
+it downloads every archive, verifies sha256, and extracts it here for you.

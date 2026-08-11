@@ -1,0 +1,51 @@
+menu "cmsis (D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/modules/hal/cmsis)"
+osource "$(ZEPHYR_CMSIS_KCONFIG)"
+config ZEPHYR_CMSIS_MODULE
+	bool
+	default y
+endmenu
+config ZEPHYR_TINYCRYPT_MODULE
+   bool
+   default y
+menu "mbedtls (D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/modules/crypto/mbedtls)"
+osource "$(ZEPHYR_MBEDTLS_KCONFIG)"
+config ZEPHYR_MBEDTLS_MODULE
+	bool
+	default y
+endmenu
+menu "fatfs (D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/modules/fs/fatfs)"
+osource "$(ZEPHYR_FATFS_KCONFIG)"
+config ZEPHYR_FATFS_MODULE
+	bool
+	default y
+endmenu
+menu "honeygui (D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/modules/honeygui)"
+osource "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/modules/honeygui/Kconfig.gui"
+config ZEPHYR_HONEYGUI_MODULE
+	bool
+	default y
+endmenu
+menu "lvgl (D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/modules/lvgl)"
+osource "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/modules/lvgl/Kconfig"
+config ZEPHYR_LVGL_MODULE
+	bool
+	default y
+endmenu
+menu "display (D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/modules/display)"
+osource "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/modules/display/Kconfig"
+config ZEPHYR_DISPLAY_MODULE
+	bool
+	default y
+endmenu
+menu "realtek (D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/modules/hal/realtek)"
+osource "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/modules/hal/realtek/Kconfig"
+config ZEPHYR_REALTEK_MODULE
+	bool
+	default y
+endmenu
+menu "realtek-app (D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app)"
+osource "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app/Kconfig"
+config ZEPHYR_REALTEK_APP_MODULE
+	bool
+	default y
+endmenu

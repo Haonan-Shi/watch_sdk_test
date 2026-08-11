@@ -1,0 +1,8 @@
+ui_resources: 
+  - example: "screen_410_502"
+    delete:
+      - "root_image/root/3d_desc/desc_prism_thick.bin"
+      - "root_image/root/video/earth_420_336_416.mjpg"
+      - "root_image/root/video/flower.mjpg"
+      - "root_image/root/video/peony_blue.mjpg"
+      - "root_image/root/video/peony_red.mjpg"

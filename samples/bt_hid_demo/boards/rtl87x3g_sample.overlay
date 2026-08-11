@@ -1,0 +1,43 @@
+/*
+ * Copyright(c) 2024, Realtek Semiconductor Corporation.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+&uart3 {
+    pinctrl-0 = <&uart3_default>;
+    pinctrl-1 = <&uart3_sleep>;
+    pinctrl-names = "default", "sleep";
+    status = "okay";
+    current-speed = <115200>;
+    parity = "none";
+    stop-bits = "1";
+    data-bits = <8>;
+    dmas = <&dma0 2 49 0xa>, <&dma0 3 48 0x10021>;
+    dma-names = "rx", "tx";
+};
+ 
+&dma0 {
+    status = "okay";
+};
+ 
+&pinctrl
+{
+    uart3_default:uart3_default {
+        group1 {
+            psels = <RTL87X3G_PSEL(UART3_TX, P2_2, DIR_OUT, DRV_HIGH, PULL_UP)>,
+            <RTL87X3G_PSEL(UART3_RX, P2_3, DIR_IN, DRV_HIGH, PULL_UP)>;
+        };
+    };
+ 
+    uart3_sleep:uart3_sleep {
+        group1 {
+            psels = <RTL87X3G_PSEL(SW_MODE, P2_2, DIR_OUT, DRV_HIGH, PULL_UP)>;
+        };
+        group2 {
+            psels = <RTL87X3G_PSEL(SW_MODE, P2_3, DIR_IN, DRV_HIGH, PULL_UP)>;
+            wakeup-low;
+        };
+    };
+};
+

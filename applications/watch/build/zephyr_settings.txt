@@ -1,0 +1,12 @@
+# WARNING. THIS FILE IS AUTO-GENERATED. DO NOT MODIFY!
+#
+# This file contains build system settings derived from your modules.
+#
+# Modules may be set via ZEPHYR_MODULES, ZEPHYR_EXTRA_MODULES,
+# and/or the west manifest file.
+#
+# See the Modules guide for more information.
+"DTS_ROOT":"D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/modules/honeygui"
+"DTS_ROOT":"D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/modules/display/device/zephyr"
+"BOARD_ROOT":"D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app"
+"SNIPPET_ROOT":"D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app"

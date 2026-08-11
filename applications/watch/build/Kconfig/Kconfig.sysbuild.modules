@@ -1,0 +1,27 @@
+config ZEPHYR_CMSIS_MODULE
+   bool
+   default y
+config ZEPHYR_TINYCRYPT_MODULE
+   bool
+   default y
+config ZEPHYR_MBEDTLS_MODULE
+   bool
+   default y
+config ZEPHYR_FATFS_MODULE
+   bool
+   default y
+config ZEPHYR_HONEYGUI_MODULE
+   bool
+   default y
+config ZEPHYR_LVGL_MODULE
+   bool
+   default y
+config ZEPHYR_DISPLAY_MODULE
+   bool
+   default y
+config ZEPHYR_REALTEK_MODULE
+   bool
+   default y
+config ZEPHYR_REALTEK_APP_MODULE
+   bool
+   default y

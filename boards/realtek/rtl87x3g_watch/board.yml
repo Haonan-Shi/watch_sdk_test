@@ -1,0 +1,8 @@
+board:
+  name: rtl87x3g_watch
+  vendor: realtek
+  socs:
+  - name: rtl8773gtp
+    variants:
+    - name: nandboot
+  - name: rtl8783gbf

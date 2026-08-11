@@ -1,0 +1,15 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+# This loads watch source code config
+
+menu "Realtek Watch Application GUI Select"
+config REALTEK_HONEYGUI_410_502_HMI_SMARTWATCH_DEMO
+    bool "Compile HMI designer smartwatch demo"
+	default n
+    help
+        Compile HMI designer smartwatch demo.
+endmenu

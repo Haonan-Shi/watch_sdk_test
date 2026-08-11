@@ -1,0 +1,17 @@
+{
+    "configurations": [
+        {
+            "name": "windows-gcc-x64",
+            "includePath": [
+            ],
+            "defines": [
+            ],
+            "compilerPath": "${USERPROFILE}\\zephyr-sdk-0.17.0\\arm-zephyr-eabi\\bin\\arm-zephyr-eabi-gcc.exe",
+            "cStandard": "c99",
+            "cppStandard": "gnu++14",
+            "intelliSenseMode": "gcc-arm",
+            "compileCommands":"${workspaceFolder}/build/compile_commands.json"
+        }
+    ],
+    "version": 4
+}

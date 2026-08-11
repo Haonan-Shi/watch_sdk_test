@@ -1,0 +1,198 @@
+/*
+ * Copyright(c) 2024, Realtek Semiconductor Corporation.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <zephyr/dt-bindings/gpio/realtek-rtl87x3g-gpio.h>
+#include <zephyr/dt-bindings/pinctrl/rtl87x3g-pinctrl.h>
+
+&sdhc0 {
+	sdcard_disk0: sdcard_disk0 {
+		compatible = "zephyr,sdmmc-disk";
+		status = "okay";
+	};
+};
+
+/* enable with CONFIG_DISK_DRIVER_FLASH_RTK */
+
+
+/* enable with CONFIG_DISK_DRIVER_FLASH_RTK 
+   and CONFIG_FILE_SYSTEM_ROMFS */
+&partitions
+{
+	partition_userdata1: partition@4d1000{
+		label = "realtek-userdata1";
+		reg = <0x4D1000 DT_SIZE_M(6)>; 
+		flash_disk0: flash_disk0 {
+			compatible = "zephyr,flash-disk";
+			partition = <&partition_userdata1>;
+			disk-name = "NOR";
+			cache-size = <4096>;
+			sector-size = <512>;
+			status = "disabled";
+		};
+	};
+	partition_userdata2: partition@ad1000{
+		label = "realtek-userdata2";
+		reg = <0xAD1000 DT_SIZE_M(5)>; 
+		read-only;    /* enable if mount ROMFS */
+		flash_disk1: flash_disk1 {
+			compatible = "zephyr,flash-disk";
+			partition = <&partition_userdata2>;
+			disk-name = "ROMFS";
+			cache-size = <0>;
+			sector-size = <512>;
+			status = "disabled";
+		};
+	};
+};
+
+
+/*delete-node only support nodes with lable */
+/delete-node/ &dtcm;
+/delete-node/ &heap_dtcm;
+/delete-node/ &sram;
+/delete-node/ &heap_sram;
+/delete-node/ &itcm;
+/delete-node/ &heap_itcm;
+/delete-node/ &dsp_share_ram;
+/delete-node/ &psram1_for_mcu;
+
+/ {
+	aliases {
+		qdec0 = &qdec;
+		dma-0 = &dma0;
+		rtc = &rtc;
+		sdhc0 = &sdhc0;
+		ext-amp = &ext_amp;
+    };
+
+	gpio_keys: gpio_keys{
+		compatible = "realtek,gpio-keys";
+		debounce-interval-ms = <30>;
+		key1: key1{
+			gpios = <KEY1_GPIO_PIN (GPIO_ACTIVE_LOW | GPIO_PULL_UP | RTL87X3G_GPIO_INPUT_PM_WAKEUP)>;
+			label = "key1";
+			key,id = <100>;
+			status = "okay";
+		};
+		key2: key2{
+			gpios = <KEY2_GPIO_PIN (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			label = "key2";
+			key,id = <101>;
+			status = "disabled";
+		};
+		key3: key3{
+			gpios = <KEY3_GPIO_PIN (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			label = "key3";
+			key,id = <102>;
+			status = "disabled";
+		};
+	};
+
+	gpio_output{
+		compatible = "gpio-leds";
+		ext_amp: ext_amp{
+			//P2_5       19  /*!< GPIOA20 */
+			gpios = <EXT_AMP_GPIO_PIN GPIO_ACTIVE_HIGH>;
+			label = "ext amp control pin";
+		};
+	};
+	
+	/* DTCM addr: 0x20000000~0x20020000, total size: 128KByte.
+	 * The front 46Kbyte was taken by RTK internal.
+	 * If users wants to increase global variables and zephyr static heap,
+	 * please follow the steps:
+	 * 1. increase dtcm size value "reg = <0x2000B800 DT_SIZE_K(NEW_SIZE)>"
+	 * 2. modify heap_dtcm addr label "heap_dtcm: memory@NEW_ADDR"
+	 * 3. modify heap_dtcm reg addr "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * 4. decrease heap_dtcm size value "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * Warning: 
+	 * 1. the dtcm address should NOT modified!
+	 * 2. the dtcm plus heap_dtcm size should NOT exceed 82KByte!
+	 */
+	dtcm {
+		dtcm: memory@2000b800 {
+			device_type = "dtcm region";
+			reg = <0x2000B800 DT_SIZE_K(81)>;
+		};
+		heap_dtcm: memory@2001fc00 {
+			device_type = "heap dtcm region";
+			reg = <0x2001FC00 DT_SIZE_K(1)>;
+		};
+	};
+	/* sram addr: 0x20020000~0x20048000, total size: 160KByte.
+	 * call zephyr_code_relocate(FILES xxx.x LOCATION SRAM) at cmakelist could relocate variables on sram. 
+	 * for more information, please refer to https://docs.zephyrproject.org/latest/kernel/code-relocation.html
+	 * If users wants to increase sram size, please follow the steps:
+	 * 1. increase sram size value "reg = <0x20020000 DT_SIZE_K(NEW_SIZE)>"
+	 * 2. modify heap_sram addr label "heap_sram: memory@NEW_ADDR"
+	 * 3. modify heap_sram reg addr "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * 4. decrease heap_sram size value "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * Warning: 
+	 * 1. the sram address should NOT modified!
+	 * 2. the sram plus heap_sram size should NOT exceed 160KByte!
+	 */
+	sram {
+		sram: memory@20020000 {
+			device_type = "sram region";
+			compatible = "zephyr,memory-region", "mmio-sram";
+			reg = <0x20020000 DT_SIZE_K(104)>;
+			zephyr,memory-region = "SRAM";
+		};
+		heap_sram: memory@2003A000 {
+			device_type = "heap sram region";
+			reg = <0x2003A000 DT_SIZE_K(56)>;
+		};
+	};
+
+	itcm {
+		itcm: memory@c0c00 {
+			device_type = "itcm region";
+			compatible = "zephyr,memory-region", "arm,itcm";
+			zephyr,memory-region = "ITCM";
+			reg = <0xC0C00 DT_SIZE_K(27)>;
+		};
+		heap_itcm: memory@c7800 {
+			device_type = "heap itcm region";
+			reg = <0xC7800 DT_SIZE_K(66)>;
+		};
+	};
+
+	dsp_ram {
+		dsp_share_ram: memory@20048000 {
+			compatible = "zephyr,memory-region";
+			device_type = "dsp_share_ram region";
+			zephyr,memory-region = "DSPRAM";
+			reg = <0x20048000 DT_SIZE_K(80)>;
+		};
+	};
+
+	psram1 {
+		psram1_for_dsp: memory@24000000{
+			compatible = "zephyr,memory-region";
+			reg = <0x24000000 DT_SIZE_K(512)>;
+			zephyr,memory-region = "PSRAM1_DSP";
+		};
+		psram1_for_mcu: memory@24080000{
+			compatible = "zephyr,memory-region";
+			reg = <0x24080000 DT_SIZE_K(2560)>;
+			zephyr,memory-region = "PSRAM1_MCU";
+		};
+		/* Last 1M of psram1: dedicated non-cacheable region.
+		 * app_lower_init.c programs it as MPU region 5 (attr 0x44,
+		 * non-cacheable). Use it ONLY by defining variables in the
+		 * PSRAM1_NC linker section (see psram_section.h / IN_PSRAM1_NC);
+		 * do NOT reference the raw address. The section is NOLOAD, so
+		 * it is not zeroed/copied at boot - initialise its contents at
+		 * runtime after psram is powered up (app_lower_init). */
+		psram1_nc: memory@24300000 {
+			compatible = "zephyr,memory-region";
+			reg = <0x24300000 DT_SIZE_K(1024)>;
+			zephyr,memory-region = "PSRAM1_NC";
+		};
+	};
+
+};
+

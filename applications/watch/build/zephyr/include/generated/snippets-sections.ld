@@ -1,0 +1,6 @@
+/* Sort key: "default" */#include "../../realtek-app/applications/watch/app_ble_service_info.ld"
+/* Sort key: "default" */#include "../../realtek-app/applications/watch/app_module_init.ld"
+/* Sort key: "default" */#include "../soc/realtek/bee/rtl87x3g/dsp_ram_section.ld"
+/* Sort key: "default" */#include "../soc/realtek/bee/rtl87x3g/sram_section.ld"
+/* Sort key: "default" */#include "../soc/realtek/bee/rtl87x3g/trace_section.ld"
+/* Sort key: "default" */#include "zephyr/linker/intlist.ld"

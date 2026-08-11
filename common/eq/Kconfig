@@ -1,0 +1,13 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "Realtek Common Module Eq"
+config REALTEK_COMMON_MODULE_EQ
+    bool "Enable Realtek Common Module Eq"
+    default n
+    help
+        Realtek common module eq support.
+endmenu

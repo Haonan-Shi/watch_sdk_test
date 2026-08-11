@@ -1,0 +1,27 @@
+{
+	"folders": [
+		{
+			"name": "watch",
+			"path": "."
+		},
+		{
+			"name": "modules",
+			"path": "../../../modules"
+		},
+		{
+			"name": "realtek-app",
+			"path": "../.."
+		},
+		{
+			"name": "zephyr",
+			"path": "../../../zephyr"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.c": "c",
+			"*.h": "c",
+			"cmakelists.*": "cmake",
+		},
+	}
+}

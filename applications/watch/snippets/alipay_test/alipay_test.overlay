@@ -1,0 +1,78 @@
+/*
+ * Copyright (c) 2026, Realtek Semiconductor Corporation
+ *
+ * SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+ */
+
+/*
+ * dts overlay for alipay engineering test (no-GUI shell build).
+ *
+ * Enabled via the alipay_test snippet (pairs with alipay_test.conf):
+ *   west build -b rtl87x3g_watch/rtl8783gbf applications/watch -p -S alipay_test
+ *   west build -b rtl87x3g_watch/rtl8773gtp applications/watch -p -S alipay_test
+ *
+ * Use only through the alipay_test snippet; do not stack onto release builds.
+ *
+ * Board portability:
+ *   The on-chip SRAM window (sram @0x20020000 + heap_sram, 160K total,
+ *   contiguous to dsp_share_ram @0x20048000) is identical on rtl8783gbf and
+ *   rtl8773gtp, so the 88K/72K re-balance below is valid on both. The
+ *   psram1_for_alipay TLSF region differs per board (gbf 0x247CE000,
+ *   gtp 0x243CE000) but is declared in each board's overlay and read via
+ *   DT_NODELABEL in code, so this file does not touch it.
+ *
+ * What this overlay does:
+ *
+ *   1. Routes zephyr,console / zephyr,shell-uart to uart2 at 921600 baud
+ *      so a regular USB-UART dongle (CH340 / FT232 etc.) can attach.
+ *   2. Re-balances SRAM: with the GUI snippet off, the alipay image's
+ *      static BSS measures ~78 KB (lwip alone is ~51 KB). sram=88K
+ *      leaves ~10 KB headroom; heap_sram=72K covers SDK-internal
+ *      RAM_TYPE_DATA_ON allocations (mbedTLS RSA buffers, alipay task
+ *      stack, etc).
+ *
+ * What this overlay deliberately does NOT do:
+ *
+ *   - No partition map override. The no-GUI alipay image is ~1316 KB
+ *     and fits in the board-default 1536 KB app-image partition. If
+ *     honeygui is later layered onto this build, the image overflows
+ *     and partitions need to be expanded -- but that is a release-time
+ *     concern, not engineering test.
+ *
+ *   - No psram1_for_data_on_fallback node. heap_sram (72K) plus the
+ *     dedicated psram1_for_alipay TLSF heap (200K, csi_malloc) cover all
+ *     current alipay allocations. If RAM_TYPE_DATA_ON pressure ever grows
+ *     (heavier cipher suites, larger session buffers, etc.), declare a
+ *     psram1_for_data_on_fallback node here pointing at a region that does
+ *     not overlap any other psram1_for_* sub-region (dsp / mcu / alipay),
+ *     and re-add the lazy registration in alipay_mem.c / osif_zephyr.c.
+ *
+ * Address sanity check (same on gbf and gtp):
+ *   sram start = 0x20020000, size = 88K = 0x16000, end = 0x20036000
+ *   heap_sram  = 0x20036000, size = 72K = 0x12000, end = 0x20048000
+ *   contiguous to dsp_share_ram@20048000, no overlap.
+ *
+ * If `os_mem_(aligned_)alloc failed! ram_type:0` appears at runtime,
+ * shrink sram and grow heap_sram (total must stay 160K to remain
+ * contiguous with dsp_share_ram).
+ */
+
+/ {
+    chosen {
+        zephyr,console = &uart2;
+        zephyr,shell-uart = &uart2;
+    };
+};
+
+&uart2 {
+    status = "okay";
+    current-speed = <921600>;
+};
+
+&sram {
+    reg = <0x20020000 DT_SIZE_K(88)>;
+};
+
+&heap_sram {
+    reg = <0x20036000 DT_SIZE_K(72)>;
+};

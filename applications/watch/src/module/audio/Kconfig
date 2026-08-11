@@ -1,0 +1,18 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+config REALTEK_APP_DSP_ONLINE_DEBUG
+	bool "dsp online debug"
+	default n
+	help
+	  This option enables the audio data capture.
+
+config REALTEK_APP_AUDIO_DATA_CAPTURE
+	bool "audio data capture"
+	default n
+	depends on REALTEK_APP_DSP_ONLINE_DEBUG
+	help
+	  This option enables the audio data capture.

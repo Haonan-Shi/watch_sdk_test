@@ -1,0 +1,23 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "rtk ppg module config"
+	
+	config RTK_PPG
+		bool "rtk ppg support"
+		depends on HUB_HRS
+		default n
+	help
+		This option enables the rtk ppg.
+	
+	config RTK_PPG_SERVICES
+		int "rtk ppg max services"
+		default 1 if RTK_PPG
+		default 0
+	help
+		This option configs ppg services.
+	
+endmenu

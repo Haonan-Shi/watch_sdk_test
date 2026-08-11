@@ -1,0 +1,28 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "DFU module config"
+	config DFU
+		bool "dfu support"
+		default y
+	help
+		This option enables the dfu.
+	
+	config DFU_NORMAL_OTA
+		bool "normal ota support"
+		depends on DFU
+		default y
+	help
+		This option enables the normal ota.
+	
+	config DFU_COMPRESS_OTA
+		bool "compress ota support"
+		depends on DFU
+		default n
+	help
+		This option enables the compress ota.
+	
+endmenu

@@ -1,0 +1,10 @@
+name: shell
+append:
+  EXTRA_DTC_OVERLAY_FILE: shell.overlay
+boards:
+  rtl87x3g_watch/rtl8773gtp:
+    append: 
+      EXTRA_CONF_FILE: boards/shell_rtl8773gtp.conf
+  rtl87x3g_watch/rtl8783gbf:
+    append: 
+      EXTRA_CONF_FILE: boards/shell_rtl8783gbf.conf

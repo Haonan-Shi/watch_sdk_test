@@ -1,0 +1,35 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+	config ALIPAY
+		bool "Alipay support"
+		default n
+	help
+	  This option enables the Alipay.
+
+	config ALIPAY_SERVICES
+		int "alipay services"
+		default 1 if ALIPAY
+		default 0
+	help
+		This option configs alipay services.
+
+	config ALIPAY_TRANSIT
+		bool "Alipay transit module support"
+		depends on ALIPAY
+		default n
+	help
+		This option enables the Alipay transit module.
+		This function requires CONFIG_REALTEK_SUBSYS_LWIP and CONFIG_REALTEK_SUBSYS_MBEDTLS to be enabled.
+
+	config ALIPAY_TEST
+		bool "Alipay shell test commands"
+		depends on ALIPAY && SHELL
+		default n
+	help
+		Register `alipay` shell command group for triggering bind / transit code /
+		paycode / unbind flows from a UART console without depending on the watch UI.
+		Intended for engineering bring-up; should be disabled in release builds.

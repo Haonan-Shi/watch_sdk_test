@@ -1,0 +1,1072 @@
+# 0 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/misc/empty_file.c"
+# 0 "<built-in>"
+# 0 "<command-line>"
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app/boards/realtek/rtl87x3g_watch/rtl87x3g_watch_rtl8773gtp.dts" 1
+
+
+
+
+/dts-v1/;
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/dts/arm/realtek/rtl87x3g.dtsi" 1 3 4
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/dts/common/mem.h" 1 3 4
+# 2 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/dts/arm/realtek/rtl87x3g.dtsi" 2 3 4
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/dts/arm/armv8.1-m.dtsi" 1 3 4
+
+
+
+
+
+
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/dts/common/skeleton.dtsi" 1 3 4
+# 9 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/dts/common/skeleton.dtsi" 3 4
+/ {
+ #address-cells = <1>;
+ #size-cells = <1>;
+ chosen { };
+ aliases { };
+};
+# 8 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/dts/arm/armv8.1-m.dtsi" 2 3 4
+
+/ {
+ soc {
+  #address-cells = <1>;
+  #size-cells = <1>;
+  compatible = "simple-bus";
+  interrupt-parent = <&nvic>;
+  ranges;
+
+  nvic: interrupt-controller@e000e100 {
+   #address-cells = <1>;
+   compatible = "arm,v8.1m-nvic";
+   reg = <0xe000e100 0xc00>;
+   interrupt-controller;
+   #interrupt-cells = <2>;
+  };
+
+  systick: timer@e000e010 {
+   compatible = "arm,armv8.1m-systick";
+   reg = <0xe000e010 0x10>;
+  };
+ };
+};
+# 3 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/dts/arm/realtek/rtl87x3g.dtsi" 2 3 4
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/dts/common/freq.h" 1 3 4
+# 4 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/dts/arm/realtek/rtl87x3g.dtsi" 2 3 4
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/dt-bindings/pinctrl/rtl87x3g-pinctrl.h" 1 3 4
+# 9 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/dt-bindings/pinctrl/rtl87x3g-pinctrl.h" 3 4
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/dt-bindings/pinctrl/realtek-rtl87x3g-pinctrl.h" 1 3 4
+# 10 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/dt-bindings/pinctrl/rtl87x3g-pinctrl.h" 2 3 4
+# 5 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/dts/arm/realtek/rtl87x3g.dtsi" 2 3 4
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/dt-bindings/clock/rtl87x3g-clocks.h" 1 3 4
+# 6 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/dts/arm/realtek/rtl87x3g.dtsi" 2 3 4
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/dt-bindings/dma/rtl87x3g-dma.h" 1 3 4
+# 7 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/dts/arm/realtek/rtl87x3g.dtsi" 2 3 4
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/dt-bindings/gpio/gpio.h" 1 3 4
+# 8 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/dts/arm/realtek/rtl87x3g.dtsi" 2 3 4
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/dt-bindings/pwm/pwm.h" 1 3 4
+# 9 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/dts/arm/realtek/rtl87x3g.dtsi" 2 3 4
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/dt-bindings/i2c/i2c.h" 1 3 4
+# 10 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/dts/arm/realtek/rtl87x3g.dtsi" 2 3 4
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/dt-bindings/adc/adc.h" 1 3 4
+# 9 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/dt-bindings/adc/adc.h" 3 4
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/dt-bindings/dt-util.h" 1 3 4
+# 19 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/dt-bindings/dt-util.h" 3 4
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_macro.h" 1 3 4
+# 34 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_macro.h" 3 4
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_internal.h" 1 3 4
+# 18 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_internal.h" 3 4
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_loops.h" 1 3 4
+# 1083 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_loops.h" 3 4
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_listify.h" 1 3 4
+# 1084 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_loops.h" 2 3 4
+# 19 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_internal.h" 2 3 4
+# 162 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_internal.h" 3 4
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_internal_is_eq.h" 1 3 4
+# 163 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_internal.h" 2 3 4
+# 193 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_internal.h" 3 4
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_internal_util_inc.h" 1 3 4
+# 194 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_internal.h" 2 3 4
+
+
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_internal_util_dec.h" 1 3 4
+# 197 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_internal.h" 2 3 4
+
+
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_internal_util_x2.h" 1 3 4
+# 200 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_internal.h" 2 3 4
+# 35 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/sys/util_macro.h" 2 3 4
+# 20 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/dt-bindings/dt-util.h" 2 3 4
+# 10 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/dt-bindings/adc/adc.h" 2 3 4
+# 11 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/dts/arm/realtek/rtl87x3g.dtsi" 2 3 4
+
+/ {
+ chosen {
+  zephyr,entropy = &trng;
+ };
+
+ cpus {
+  #address-cells = <1>;
+  #size-cells = <0>;
+
+  cpu: cpu@0 {
+   device_type = "cpu";
+   compatible = "arm,cortex-m55";
+   reg = <0>;
+   #address-cells = <1>;
+   #size-cells = <1>;
+  };
+ };
+
+ rom {
+  #address-cells = <1>;
+  #size-cells = <1>;
+
+  boot_rom: memory@0 {
+   device_type = "boot rom region";
+   reg = <0x0 ((220) * 1024)>;
+  };
+
+  stack_rom: memory@37000 {
+   device_type = "stack rom region";
+   reg = <0x37000 ((516) * 1024)>;
+  };
+ };
+
+ internal_ram {
+  #address-cells = <1>;
+  #size-cells = <1>;
+
+  internal_itcm: memory@b8000 {
+   device_type = "internal itcm region";
+   reg = <0xB8000 ((35) * 1024)>;
+  };
+
+  internal_dtcm: memory@20000000 {
+   device_type = "internal dtcm region";
+   reg = <0x20000000 ((46) * 1024)>;
+  };
+ };
+
+ itcm {
+  #address-cells = <1>;
+  #size-cells = <1>;
+
+  itcm: memory@c0c00 {
+   device_type = "itcm region";
+   compatible = "zephyr,memory-region", "arm,itcm";
+   zephyr,memory-region = "ITCM";
+   reg = <0xC0C00 ((50) * 1024)>;
+  };
+  heap_itcm: memory@cd400 {
+   device_type = "heap itcm region";
+   reg = <0xCD400 ((43) * 1024)>;
+  };
+ };
+
+ dtcm {
+  #address-cells = <1>;
+  #size-cells = <1>;
+
+  dtcm: memory@2000b800 {
+   device_type = "dtcm region";
+   reg = <0x2000B800 ((60) * 1024)>;
+  };
+  heap_dtcm: memory@2001a800 {
+   device_type = "heap dtcm region";
+   reg = <0x2001A800 ((22) * 1024)>;
+  };
+ };
+
+ sram {
+  #address-cells = <1>;
+  #size-cells = <1>;
+
+  sram: memory@20020000 {
+   device_type = "sram region";
+   compatible = "zephyr,memory-region", "mmio-sram";
+   reg = <0x20020000 ((60) * 1024)>;
+   zephyr,memory-region = "SRAM";
+  };
+  heap_sram: memory@2002f000 {
+   device_type = "heap sram region";
+   reg = <0x2002F000 ((100) * 1024)>;
+  };
+ };
+
+ dsp_ram {
+  #address-cells = <1>;
+  #size-cells = <1>;
+  dsp_share_ram: memory@20048000 {
+   compatible = "zephyr,memory-region";
+   device_type = "dsp_share_ram region";
+   zephyr,memory-region = "DSPRAM";
+   reg = <0x20048000 ((80) * 1024)>;
+  };
+ };
+
+ buffer_ram {
+  #address-cells = <1>;
+  #size-cells = <1>;
+
+  lowstack_global: memory@20400000 {
+   device_type = "lowstack global region";
+   reg = <0x20400000 ((2) * 1024)>;
+  };
+  heap_buffer_ram: memory@20400800 {
+   device_type = "heap buffer_ram region";
+   reg = <0x20400800 ((62) * 1024)>;
+  };
+ };
+
+ soc {
+  fmc: flash-controller@40022000 {
+   compatible = "realtek,rtl87x3g-nor-flash-controller";
+   reg = <0x40022000 0x400>;
+   #address-cells = <1>;
+   #size-cells = <1>;
+   status = "okay";
+
+   flash: flash@70000000 {
+    compatible = "soc-nv-flash";
+    write-block-size = <1>;
+    erase-block-size = <4096>;
+   };
+  };
+
+  trace: memory@e0640000 {
+   compatible = "zephyr,memory-region";
+   reg = <0xE0640000 0x400000>;
+   zephyr,memory-region = "TRACE";
+  };
+
+  rcu: reset-clock-controller@40000200 {
+   compatible = "realtek,rtl87x3g-rcu";
+   reg = <0x40000200 0x400>;
+   status = "okay";
+
+   cctl: clock-controller {
+    compatible = "realtek,rtl87x3g-cctl";
+    #clock-cells = <1>;
+    status = "okay";
+   };
+  };
+
+  pinctrl: pin-controller@40000500 {
+   compatible = "realtek,rtl87x3g-pinctrl";
+   #address-cells = <1>;
+   #size-cells = <1>;
+   reg = <0x40000500 0x864>;
+
+   gpioa: gpio@40001000 {
+    compatible = "realtek,rtl87x3g-gpio";
+    gpio-controller;
+    #gpio-cells = <2>;
+    reg = <0x40001000 0x64>;
+    clocks = <&cctl (49)>;
+    port = <0>;
+    interrupts = <18 0>, <19 0>, <20 0>, <21 0>, <22 0>, <23 0>;
+    status = "disabled";
+   };
+
+   gpiob: gpio@40004800 {
+    compatible = "realtek,rtl87x3g-gpio";
+    gpio-controller;
+    #gpio-cells = <2>;
+    reg = <0x40004800 0x64>;
+    clocks = <&cctl (48)>;
+    port = <1>;
+    interrupts = <37 0>, <38 0>, <39 0>, <40 0>;
+    status = "disabled";
+   };
+  };
+
+  uart0: serial@40011000 {
+   compatible = "realtek,rtl87x3g-uart";
+   reg = <0x40011000 0x60>;
+   clocks = <&cctl (21)>;
+   interrupts = <14 0>;
+   status = "disabled";
+  };
+
+  uart2: serial@40012400 {
+   compatible = "realtek,rtl87x3g-uart";
+   reg = <0x40012400 0x60>;
+   clocks = <&cctl (19)>;
+   interrupts = <16 0>;
+   status = "disabled";
+  };
+
+  uart3: serial@40012800 {
+   compatible = "realtek,rtl87x3g-uart";
+   reg = <0x40012800 0x60>;
+   clocks = <&cctl (18)>;
+   interrupts = <47 0>;
+   status = "disabled";
+  };
+
+  uart4: serial@40012c00 {
+   compatible = "realtek,rtl87x3g-uart";
+   reg = <0x40012c00 0x60>;
+   clocks = <&cctl (17)>;
+   interrupts = <48 0>;
+   status = "disabled";
+  };
+
+  uart5: serial@40024000 {
+   compatible = "realtek,rtl87x3g-uart";
+   reg = <0x40024000 0x60>;
+   clocks = <&cctl (16)>;
+   interrupts = <49 0>;
+   status = "disabled";
+  };
+
+  dma0: dma@400952c0 {
+   compatible = "realtek,rtl87x3g-dma";
+   reg = <0x400952c0 0x6c0>;
+   interrupts = <65 0>,
+                <66 0>,
+                <112 0>,
+                <113 0>,
+                <114 0>,
+                <115 0>;
+   dma-channels = <6>;
+   clocks = <&cctl (15)>;
+   dma-port = <0>;
+   #dma-cells = <3>;
+   status = "disabled";
+  };
+
+  sleep_led: sleep_led@40000600 {
+   compatible = "realtek,rtl87x3g-led";
+   reg = <0x40000600 0x88>;
+   status = "disabled";
+  };
+
+  timer4: timer@40025140 {
+   compatible = "realtek,rtl87x3g-timer";
+   reg = <0x40025140 0x50>;
+   interrupts = <54 0>;
+   channels = <0>;
+   clocks = <&cctl (8)>;
+   status = "disabled";
+   port = <1>;
+   channel = <4>;
+   case = <7>;
+
+   pwm4 {
+    compatible = "realtek,rtl87x3g-pwm";
+    status = "disabled";
+    #pwm-cells = <3>;
+   };
+  };
+
+  timer5: timer@40025190 {
+   compatible = "realtek,rtl87x3g-timer";
+   reg = <0x40025190 0x50>;
+   interrupts = <55 0>;
+   channels = <0>;
+   clocks = <&cctl (8)>;
+   status = "disabled";
+   port = <1>;
+   channel = <5>;
+   case = <7>;
+
+   pwm5 {
+    compatible = "realtek,rtl87x3g-pwm";
+    status = "disabled";
+    #pwm-cells = <3>;
+   };
+  };
+
+  timer6: timer@400251e0 {
+   compatible = "realtek,rtl87x3g-timer";
+   reg = <0x400251e0 0x50>;
+   interrupts = <71 0>;
+   channels = <0>;
+   clocks = <&cctl (8)>;
+   status = "disabled";
+   port = <1>;
+   channel = <6>;
+   case = <3>;
+   pwm6 {
+    compatible = "realtek,rtl87x3g-pwm";
+    status = "disabled";
+    #pwm-cells = <3>;
+   };
+  };
+
+  timer7: timer@40025230 {
+   compatible = "realtek,rtl87x3g-timer";
+   reg = <0x40025230 0x50>;
+   interrupts = <72 0>;
+   channels = <0>;
+   clocks = <&cctl (8)>;
+   status = "disabled";
+   port = <1>;
+   channel = <7>;
+   case = <3>;
+   pwm7 {
+    compatible = "realtek,rtl87x3g-pwm";
+    status = "disabled";
+    #pwm-cells = <3>;
+   };
+  };
+
+  timer8: timer@40025280 {
+   compatible = "realtek,rtl87x3g-timer";
+   reg = <0x40025280 0x50>;
+   interrupts = <73 0>;
+   channels = <0>;
+   clocks = <&cctl (8)>;
+   status = "disabled";
+   port = <1>;
+   channel = <8>;
+   case = <3>;
+
+   pwm8 {
+    compatible = "realtek,rtl87x3g-pwm";
+    status = "disabled";
+    #pwm-cells = <3>;
+   };
+  };
+
+  spi0: spi@40013000 {
+   compatible = "realtek,rtl87x3g-spi";
+   reg = <0x40013000 0xf0>;
+   interrupts = <5 0>;
+   clocks = <&cctl (42)>;
+   status = "disabled";
+   #address-cells = <1>;
+   #size-cells = <0>;
+   max-bus-freq = <20000000>;
+  };
+
+  spi0_slave: spi_slave@40015c00 {
+   compatible = "realtek,rtl87x3g-spi";
+   reg = <0x40015c00 0xf0>;
+   interrupts = <103 0>;
+   clocks = <&cctl (33)>;
+   status = "disabled";
+   #address-cells = <1>;
+   #size-cells = <0>;
+   is-slave;
+  };
+
+  spi1: spi@40019000 {
+   compatible = "realtek,rtl87x3g-spi";
+   reg = <0x40019000 0xf0>;
+   interrupts = <41 0>;
+   clocks = <&cctl (41)>;
+   status = "disabled";
+   #address-cells = <1>;
+   #size-cells = <0>;
+   max-bus-freq = <20000000>;
+  };
+
+  spi1_hs: spi@40070000 {
+   compatible = "realtek,rtl87x3g-spi";
+   reg = <0x40070000 0xf0>;
+   interrupts = <41 0>;
+   clocks = <&cctl (41)>;
+   status = "disabled";
+   #address-cells = <1>;
+   #size-cells = <0>;
+   max-bus-freq = <50000000>;
+  };
+
+  spi2: spi@40016000 {
+   compatible = "realtek,rtl87x3g-spi";
+   reg = <0x40016000 0xf0>;
+   interrupts = <42 0>;
+   clocks = <&cctl (39)>;
+   status = "disabled";
+   #address-cells = <1>;
+   #size-cells = <0>;
+   max-bus-freq = <20000000>;
+  };
+
+  i2c0: i2c@40015000 {
+   compatible = "realtek,rtl87x3g-i2c";
+   reg = <0x40015000 0xa4>;
+   clock-frequency = <100000>;
+   #address-cells = <1>;
+   #size-cells = <0>;
+   interrupts = <6 0>;
+   clocks = <&cctl (38)>;
+   status = "disabled";
+  };
+
+  i2c1: i2c@40015400 {
+   compatible = "realtek,rtl87x3g-i2c";
+   reg = <0x40015400 0xa4>;
+   clock-frequency = <100000>;
+   #address-cells = <1>;
+   #size-cells = <0>;
+   interrupts = <43 0>;
+   clocks = <&cctl (37)>;
+   status = "disabled";
+  };
+
+  i2c2: i2c@40015800 {
+   compatible = "realtek,rtl87x3g-i2c";
+   reg = <0x40015800 0xa4>;
+   clock-frequency = <100000>;
+   #address-cells = <1>;
+   #size-cells = <0>;
+   interrupts = <44 0>;
+   clocks = <&cctl (34)>;
+   status = "disabled";
+  };
+
+  qdec: qdec@40004000 {
+   compatible = "realtek,rtl87x3g-qdec";
+   reg = <0x40004000 0x30>;
+   interrupts = <46 0>;
+   clocks = <&cctl (36)>;
+   status = "disabled";
+  };
+
+  rtc: rtc@40000100 {
+   compatible = "realtek,rtl87x3g-rtc";
+   reg = <0x40000100 0x40>;
+   interrupts = <13 0>;
+   channels = <4>;
+   alarms-count = <4>;
+   status = "disabled";
+  };
+
+  input_kscan: input_kscan@40004400 {
+   compatible = "realtek,rtl87x3g-input-kscan";
+   reg = <0x40004400 0x44>;
+   interrupts = <45 0>;
+   clocks = <&cctl (35)>;
+   max-row-size = <12>;
+   max-col-size = <20>;
+   status = "disabled";
+  };
+
+  zephyr_udc0: udc@40100000 {
+   compatible = "realtek,rtl87x3g-udc", "snps,dwc2";
+   reg = <0x40100000 0x40000>, <0x40100000 0x40000>;
+   reg-names = "wrapper", "core";
+   interrupts = <81 0>;
+   num-in-eps = <6>;
+   num-out-eps = <6>;
+   ghwcfg1 = <0>;
+   ghwcfg2 = <0x22abfc72>;
+   ghwcfg4 = <0x1e10aa60>;
+   status = "disabled";
+  };
+
+  sdhc0: sdhc@40060000 {
+   compatible = "realtek,rtl87x3g-sdhc";
+   reg = <0x40060000 0x200>;
+   interrupts = <60 0>;
+   clocks = <&cctl (14)>;
+   #address-cells = <1>;
+   #size-cells = <0>;
+   max-bus-freq = <50000000>;
+   min-bus-freq = <40000>;
+   status = "disabled";
+  };
+
+
+  sdhc1: sdhc@40062000 {
+   compatible = "realtek,rtl87x3g-sdhc";
+   reg = <0x40062000 0x200>;
+   interrupts = <109 0>;
+   clocks = <&cctl (27)>;
+   #address-cells = <1>;
+   #size-cells = <0>;
+   max-bus-freq = <50000000>;
+   min-bus-freq = <40000>;
+   status = "disabled";
+  };
+
+  adc: adc@40010000 {
+    compatible = "realtek,rtl87x3g-adc";
+    reg = <0x40010000 0x60>;
+    interrupts = <18 0>;
+    clocks = <&cctl (50)>;
+    channels = <8>;
+    status = "disabled";
+    #io-channel-cells = <1>;
+  };
+
+  trng: trng@400c2400 {
+   compatible = "realtek,bee-trng";
+   reg = <0x400c2400 0x68>;
+   status = "okay";
+  };
+
+ };
+
+};
+
+&nvic {
+ arm,num-irq-priority-bits = <3>;
+};
+# 7 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app/boards/realtek/rtl87x3g_watch/rtl87x3g_watch_rtl8773gtp.dts" 2
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app/boards/realtek/rtl87x3g_watch/rtl87x3g_watch_rtl8773gtp-pinctrl.dtsi" 1
+
+
+
+
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/dt-bindings/pinctrl/rtl87x3g-pinctrl.h" 1 3 4
+# 6 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app/boards/realtek/rtl87x3g_watch/rtl87x3g_watch_rtl8773gtp-pinctrl.dtsi" 2
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app/boards/realtek/rtl87x3g_watch/board_pin_assignments/rtl8773gtp/board.h" 1
+# 7 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app/boards/realtek/rtl87x3g_watch/rtl87x3g_watch_rtl8773gtp-pinctrl.dtsi" 2
+
+&pinctrl
+{
+ uart2_default:uart2_default {
+  group1 {
+   psels = <(((((23) & 0x7FFU) << 0U) | (((29) & 0xFFFFU) << 16U)) | ((((1) & 0x1U) << 14U) | (((1) & 0x1U) << 13U) | (((1) & 0x3U) << 11U)))>,
+   <(((((27) & 0x7FFU) << 0U) | (((30) & 0xFFFFU) << 16U)) | ((((0) & 0x1U) << 14U) | (((1) & 0x1U) << 13U) | (((1) & 0x3U) << 11U)))>;
+  };
+ };
+
+ uart2_sleep:uart2_sleep {
+  group1 {
+   psels = <(((((23) & 0x7FFU) << 0U) | (((((255 + 1) + 4)) & 0xFFFFU) << 16U)) | ((((1) & 0x1U) << 14U) | (((1) & 0x1U) << 13U) | (((1) & 0x3U) << 11U)))>;
+  };
+  group2 {
+   psels = <(((((27) & 0x7FFU) << 0U) | (((((255 + 1) + 4)) & 0xFFFFU) << 16U)) | ((((0) & 0x1U) << 14U) | (((1) & 0x1U) << 13U) | (((1) & 0x3U) << 11U)))>;
+   wakeup-low;
+  };
+ };
+
+ sdhc0_default: sdhc0_default {
+  group1 {
+    psels =
+    <(((((36) & 0x7FFU) << 0U) | ((((((255 + 1) + 4) + ((255 + 1) + 4) / 2 + 2)) & 0xFFFFU) << 16U)) | ((((1) & 0x1U) << 14U) | (((1) & 0x1U) << 13U) | (((1) & 0x3U) << 11U)))>,
+    <(((((37) & 0x7FFU) << 0U) | ((((((255 + 1) + 4) + ((255 + 1) + 4) / 2 + 2)) & 0xFFFFU) << 16U)) | ((((1) & 0x1U) << 14U) | (((1) & 0x1U) << 13U) | (((1) & 0x3U) << 11U)))>,
+    <(((((38) & 0x7FFU) << 0U) | ((((((255 + 1) + 4) + ((255 + 1) + 4) / 2 + 2)) & 0xFFFFU) << 16U)) | ((((1) & 0x1U) << 14U) | (((1) & 0x1U) << 13U) | (((1) & 0x3U) << 11U)))>;
+    bias-pull-strong;
+  };
+ };
+
+ sdhc0_sleep: sdhc0_sleep {
+  group1 {
+    psels =
+    <(((((36) & 0x7FFU) << 0U) | (((((255 + 1) + 4)) & 0xFFFFU) << 16U)) | ((((0) & 0x1U) << 14U) | (((0) & 0x1U) << 13U) | (((0) & 0x3U) << 11U)))>,
+    <(((((37) & 0x7FFU) << 0U) | (((((255 + 1) + 4)) & 0xFFFFU) << 16U)) | ((((0) & 0x1U) << 14U) | (((0) & 0x1U) << 13U) | (((0) & 0x3U) << 11U)))>,
+    <(((((38) & 0x7FFU) << 0U) | (((((255 + 1) + 4)) & 0xFFFFU) << 16U)) | ((((0) & 0x1U) << 14U) | (((0) & 0x1U) << 13U) | (((0) & 0x3U) << 11U)))>;
+  };
+ };
+
+ i2c1_default:i2c1_default {
+  group1 {
+   psels =
+
+   <(((((0) & 0x7FFU) << 0U) | (((7) & 0xFFFFU) << 16U)) | ((((1) & 0x1U) << 14U) | (((1) & 0x1U) << 13U) | (((2) & 0x3U) << 11U)))>,
+   <(((((1) & 0x7FFU) << 0U) | (((8) & 0xFFFFU) << 16U)) | ((((1) & 0x1U) << 14U) | (((1) & 0x1U) << 13U) | (((2) & 0x3U) << 11U)))>;
+  };
+ };
+ i2c1_sleep:i2c1_sleep {
+  group1 {
+   psels =
+   <(((((0) & 0x7FFU) << 0U) | (((((255 + 1) + 4)) & 0xFFFFU) << 16U)) | ((((0) & 0x1U) << 14U) | (((0) & 0x1U) << 13U) | (((1) & 0x3U) << 11U)))>,
+   <(((((1) & 0x7FFU) << 0U) | (((((255 + 1) + 4)) & 0xFFFFU) << 16U)) | ((((0) & 0x1U) << 14U) | (((0) & 0x1U) << 13U) | (((1) & 0x3U) << 11U)))>;
+  };
+ };
+};
+# 8 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app/boards/realtek/rtl87x3g_watch/rtl87x3g_watch_rtl8773gtp.dts" 2
+
+/ {
+ model = "Realtek rtl8773gtp Watch";
+ compatible = "realtek,rtl87x3g_watch_rtl8773gtp";
+ chosen {
+  zephyr,sram = &dtcm;
+  zephyr,itcm = &itcm;
+  zephyr,flash = &flash;
+  zephyr,code-partition = &bank0_app_partition;
+
+
+
+
+
+  zephyr,flash-controller = &fmc;
+ };
+
+ aliases {
+  ftl-region = &ftl_region;
+  ftl-region-storage-base = &flash;
+  vp-data = &bank0_ext_img0;
+  vp-data-storage-base = &flash;
+  bt-host = &bt_host;
+  bt-host-storage-base = &flash;
+ };
+
+ psram0:psram0 {
+  #address-cells = <1>;
+  #size-cells = <1>;
+  psram0_for_mcu: memory@22000000{
+   compatible = "zephyr,memory-region";
+   reg = <0x22000000 ((4096) * 1024)>;
+   zephyr,memory-region = "PSRAM0_MCU";
+  };
+ };
+
+ psram1:psram1 {
+  #address-cells = <1>;
+  #size-cells = <1>;
+# 57 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app/boards/realtek/rtl87x3g_watch/rtl87x3g_watch_rtl8773gtp.dts"
+  psram1_for_mcu: memory@24000000{
+   compatible = "zephyr,memory-region";
+   reg = <0x24000000 ((4096) * 1024)>;
+   zephyr,memory-region = "PSRAM1_MCU";
+  };
+ };
+};
+
+&flash
+{
+ reg = <0x70000000 ((16) * 1024 * 1024)>;
+ partitions: partitions {
+  compatible = "fixed-partitions";
+  #address-cells = <1>;
+  #size-cells = <1>;
+  reserved: partition@0 {
+   label = "reserved-image";
+   reg = <0x0 ((8) * 1024)>;
+  };
+  config_file: partition@2000 {
+   label = "config-file-image";
+   reg = <0x2000 ((4) * 1024)>;
+  };
+  boot_patch_0: partition@4000 {
+   label = "boot-patch-0-image";
+   reg = <0x4000 ((12) * 1024)>;
+  };
+  boot_patch_1: partition@7000 {
+   label = "boot-patch-1-image";
+   reg = <0x7000 ((12) * 1024)>;
+  };
+  bt_host: partition@a000 {
+   label = "bt_host";
+   reg = <0xA000 ((252) * 1024)>;
+  };
+  bank0_ota_header: partition@49000 {
+   label = "ota-header-image";
+   reg = <0x49000 ((1) * 1024)>;
+  };
+  bank0_stack_patch: partition@4a000 {
+   label = "stack-patch-image";
+   reg = <0x4A000 ((200) * 1024)>;
+  };
+  bank0_system_patch: partition@7c000 {
+   label = "system-patch-image";
+   reg = <0x7c000 ((22) * 1024)>;
+  };
+  bank0_app_partition: partition@9e000 {
+   label = "app-image";
+   reg = <0x9E000 ((1536) * 1024)>;
+  };
+  bank0_dsp_sys: partition@21e000 {
+   label = "bank0_dsp_sys-image";
+   reg = <0x21E000 ((632) * 1024)>;
+  };
+  bank0_dsp_app: partition@2bc000 {
+   label = "bank0_dsp_app-image";
+   reg = <0x2BC000 ((256) * 1024)>;
+  };
+  bank0_dsp_cfg: partition@2fc000 {
+   label = "bank0_dsp_cfg-image";
+   reg = <0x2FC000 ((40) * 1024)>;
+  };
+  bank0_app_cfg: partition@306000 {
+   label = "bank0_app_cfg-image";
+   reg = <0x306000 ((8) * 1024)>;
+  };
+  bank0_ext_img0: partition@308000 {
+   label = "bank0_ext_img0-image";
+   reg = <0x308000 ((200) * 1024)>;
+  };
+
+  ftl_region: partition@33a000 {
+   label = "realtek-ftl-region";
+   reg = <0x33A000 ((32) * 1024)>;
+  };
+  partition_userdata1: partition@4d1000{
+   label = "realtek-userdata1";
+   reg = <0x4D1000 ((11) * 1024 * 1024)>;
+  };
+ };
+};
+
+&gpioa {
+ status = "okay";
+};
+
+&gpiob {
+ status = "okay";
+};
+
+&dma0 {
+    status = "okay";
+};
+
+&rtc {
+    status = "okay";
+ channels = <1>;
+    prescaler = <1>;
+};
+
+&sdhc0 {
+    pin-group = <0>;
+    bus-width = <1>;
+ max-bus-freq = <40000000>;
+
+ pwr-gpios = <&gpioa 6 (0 << 0)>;
+    pinctrl-0 = <&sdhc0_default>;
+ pinctrl-1 = <&sdhc0_sleep>;
+    pinctrl-names = "default", "sleep";
+ status = "okay";
+};
+
+&i2c1 {
+ pinctrl-0 = <&i2c1_default>;
+ pinctrl-1 = <&i2c1_sleep>;
+    pinctrl-names = "default", "sleep";
+ clock-frequency = <400000>;
+ status = "okay";
+};
+
+&cpu {
+ clock-frequency = <40000000>;
+};
+
+&uart2 {
+ pinctrl-0 = <&uart2_default>;
+ pinctrl-1 = <&uart2_sleep>;
+ pinctrl-names = "default", "sleep";
+ status = "disabled";
+ current-speed = <2000000>;
+ parity = "none";
+ stop-bits = "1";
+ data-bits = <8>;
+};
+# 0 "<command-line>" 2
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app/applications/watch/boards/rtl87x3g_watch_rtl8773gtp.overlay" 1
+
+
+
+
+
+
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/include/zephyr/dt-bindings/gpio/realtek-rtl87x3g-gpio.h" 1 3 4
+# 8 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app/applications/watch/boards/rtl87x3g_watch_rtl8773gtp.overlay" 2
+
+
+&sdhc0 {
+ sdcard_disk0: sdcard_disk0 {
+  compatible = "zephyr,sdmmc-disk";
+  status = "okay";
+ };
+};
+
+
+
+
+
+
+&partitions
+{
+ partition_userdata1: partition@4d1000{
+  label = "realtek-userdata1";
+  reg = <0x4D1000 ((6) * 1024 * 1024)>;
+  flash_disk0: flash_disk0 {
+   compatible = "zephyr,flash-disk";
+   partition = <&partition_userdata1>;
+   disk-name = "NOR";
+   cache-size = <4096>;
+   sector-size = <512>;
+   status = "disabled";
+  };
+ };
+ partition_userdata2: partition@ad1000{
+  label = "realtek-userdata2";
+  reg = <0xAD1000 ((5) * 1024 * 1024)>;
+  read-only;
+  flash_disk1: flash_disk1 {
+   compatible = "zephyr,flash-disk";
+   partition = <&partition_userdata2>;
+   disk-name = "ROMFS";
+   cache-size = <0>;
+   sector-size = <512>;
+   status = "disabled";
+  };
+ };
+};
+
+
+
+/delete-node/ &dtcm;
+/delete-node/ &heap_dtcm;
+/delete-node/ &sram;
+/delete-node/ &heap_sram;
+/delete-node/ &itcm;
+/delete-node/ &heap_itcm;
+/delete-node/ &dsp_share_ram;
+/delete-node/ &psram1_for_mcu;
+
+/ {
+ aliases {
+  qdec0 = &qdec;
+  dma-0 = &dma0;
+  rtc = &rtc;
+  sdhc0 = &sdhc0;
+  ext-amp = &ext_amp;
+    };
+
+ gpio_keys: gpio_keys{
+  compatible = "realtek,gpio-keys";
+  debounce-interval-ms = <30>;
+  key1: key1{
+   gpios = <&gpioa 23 ((1 << 0) | (1 << 4) | (1 << 7))>;
+   label = "key1";
+   key,id = <100>;
+   status = "okay";
+  };
+  key2: key2{
+   gpios = <&gpioa 0 ((1 << 0) | (1 << 4))>;
+   label = "key2";
+   key,id = <101>;
+   status = "disabled";
+  };
+  key3: key3{
+   gpios = <&gpioa 24 ((1 << 0) | (1 << 4))>;
+   label = "key3";
+   key,id = <102>;
+   status = "disabled";
+  };
+ };
+
+ gpio_output{
+  compatible = "gpio-leds";
+  ext_amp: ext_amp{
+
+   gpios = <&gpioa 20 (0 << 0)>;
+   label = "ext amp control pin";
+  };
+ };
+# 115 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app/applications/watch/boards/rtl87x3g_watch_rtl8773gtp.overlay"
+ dtcm {
+  dtcm: memory@2000b800 {
+   device_type = "dtcm region";
+   reg = <0x2000B800 ((81) * 1024)>;
+  };
+  heap_dtcm: memory@2001fc00 {
+   device_type = "heap dtcm region";
+   reg = <0x2001FC00 ((1) * 1024)>;
+  };
+ };
+# 137 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app/applications/watch/boards/rtl87x3g_watch_rtl8773gtp.overlay"
+ sram {
+  sram: memory@20020000 {
+   device_type = "sram region";
+   compatible = "zephyr,memory-region", "mmio-sram";
+   reg = <0x20020000 ((104) * 1024)>;
+   zephyr,memory-region = "SRAM";
+  };
+  heap_sram: memory@2003A000 {
+   device_type = "heap sram region";
+   reg = <0x2003A000 ((56) * 1024)>;
+  };
+ };
+
+ itcm {
+  itcm: memory@c0c00 {
+   device_type = "itcm region";
+   compatible = "zephyr,memory-region", "arm,itcm";
+   zephyr,memory-region = "ITCM";
+   reg = <0xC0C00 ((27) * 1024)>;
+  };
+  heap_itcm: memory@c7800 {
+   device_type = "heap itcm region";
+   reg = <0xC7800 ((66) * 1024)>;
+  };
+ };
+
+ dsp_ram {
+  dsp_share_ram: memory@20048000 {
+   compatible = "zephyr,memory-region";
+   device_type = "dsp_share_ram region";
+   zephyr,memory-region = "DSPRAM";
+   reg = <0x20048000 ((80) * 1024)>;
+  };
+ };
+
+ psram1 {
+  psram1_for_dsp: memory@24000000{
+   compatible = "zephyr,memory-region";
+   reg = <0x24000000 ((512) * 1024)>;
+   zephyr,memory-region = "PSRAM1_DSP";
+  };
+  psram1_for_mcu: memory@24080000{
+   compatible = "zephyr,memory-region";
+   reg = <0x24080000 ((2560) * 1024)>;
+   zephyr,memory-region = "PSRAM1_MCU";
+  };
+
+
+
+
+
+
+
+  psram1_nc: memory@24300000 {
+   compatible = "zephyr,memory-region";
+   reg = <0x24300000 ((1024) * 1024)>;
+   zephyr,memory-region = "PSRAM1_NC";
+  };
+ };
+
+};
+# 0 "<command-line>" 2
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app/snippets/gui/honeygui/honeygui.overlay" 1
+
+
+
+
+
+
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/modules/display/device/zephyr/dts/rtl87x3g-display-lcd.dtsi" 1 3 4
+# 12 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/modules/display/device/zephyr/dts/rtl87x3g-display-lcd.dtsi" 3 4
+/ {
+
+ display_lcd: display@8000000 {
+  compatible = "realtek,rtl87x3g-display-lcd";
+  reg = <0x08000000 0x80000>;
+  width = <480>;
+  height = <272>;
+ };
+
+};
+# 8 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app/snippets/gui/honeygui/honeygui.overlay" 2
+
+&display_lcd {
+    status = "okay";
+};
+
+/ {
+    chosen {
+        zephyr,display = &display_lcd;
+    };
+};
+# 0 "<command-line>" 2
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app/snippets/gui/honeygui/honeygui_screen_410_502/honeygui_screen_410_502.overlay" 1
+# 10 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/realtek-app/snippets/gui/honeygui/honeygui_screen_410_502/honeygui_screen_410_502.overlay"
+&i2c1 {
+    touch_device: touch_chsc6417@2e {
+        compatible = "chipsemi,chsc6417";
+        reg = <0x2E>;
+        irq-gpios = <&gpioa 2 (0 << 0)>;
+        rst-gpios = <&gpioa 3 (0 << 0)>;
+        gesture-release-timeout-ms = <30>;
+        status = "okay";
+    };
+};
+# 0 "<command-line>" 2
+# 1 "D:/watch/GItCode/zephyr_sdk/RTL87X3G_MCU_SDK_Watch_Zephyr_v1.14.3.1/zephyr/misc/empty_file.c"
