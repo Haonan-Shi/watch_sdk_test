@@ -1,0 +1,17 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+config REALTEK_KEY_BUTTON_8773G_ZEPHYR
+	bool "Enable Realtek Key/Button Deivce with Zephyr code style"
+	default n
+	help
+		This config for realtek Key/Button device driver
+
+config REALTEK_INPUT_INIT_PRIORITY
+	int "Realtek Input Init Priority of Zephyr"
+	default 60
+	help
+		This config for realtek input init priority of zephyr

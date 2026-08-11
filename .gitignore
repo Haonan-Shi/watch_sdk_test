@@ -1,0 +1,45 @@
+# Build directory (Zephyr build output)
+build/
+# in case of using a different build directory
+*build/
+build*/
+
+# app post build files
+bin/
+honeygui_userdata/
+applications/deskmate/
+applications/eBadge/
+
+# Genrated file from Zephyr
+VERSION
+
+# claude settings
+**/settings.local.json
+CLAUDE.local.md
+
+# doc build 
+doc/_build/
+doc/_static/js/ga_config.js
+doc/index.rst
+
+# scripts
+script/build_log.txt
+
+#python cache 
+__pycache__/
+
+# --- gh_release working metadata (never commit / never push) ---
+/staging/
+/.claude/
+/script/build/gh_release/
+
+# --- fetched release payload (downloaded by fetch_assets.py; keep tree clean) ---
+/bin/*
+!/bin/README
+/tools/*
+!/tools/README
+!/tools/.west
+!/tools/Gadgets
+!/tools/flash
+!/tools/meta_tools
+!/tools/mpcli

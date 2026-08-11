@@ -1,0 +1,13 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "Realtek Common Module Usb"
+config REALTEK_COMMON_MODULE_USB
+    bool "Enable Realtek Common Module Usb"
+    default n
+    help
+        Realtek common module usb support.
+endmenu

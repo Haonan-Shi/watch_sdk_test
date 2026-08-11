@@ -1,0 +1,55 @@
+# Copyright (c) 2024 Realtek Semiconductor Corp.
+# SPDX-License-Identifier: Apache-2.0
+#################Zephyr Kernel Config########################
+#DISASSEMBLY
+CONFIG_OUTPUT_DISASSEMBLY=y
+# Enable HW stack protection
+CONFIG_HW_STACK_PROTECTION=y
+#compile and libc config
+CONFIG_NEWLIB_LIBC=y
+CONFIG_NEWLIB_LIBC_MIN_REQUIRED_HEAP_SIZE=0
+#zephyr assert
+CONFIG_ASSERT=y
+#zephyr log config
+CONFIG_LOG=y
+CONFIG_LOG_DEFAULT_LEVEL=3
+CONFIG_PRINTK=y
+CONFIG_DEBUG_COREDUMP=y
+CONFIG_DEBUG_COREDUMP_BACKEND_LOGGING=y
+CONFIG_DEBUG_COREDUMP_MEMORY_DUMP_MIN=y
+CONFIG_EXTRA_EXCEPTION_INFO=y
+CONFIG_THREAD_ANALYZER=y
+CONFIG_THREAD_NAME=y
+# used by dma
+CONFIG_HEAP_MEM_POOL_SIZE=2048 
+#################Zephyr Drivers Config########################
+#hardware device config
+CONFIG_GPIO=y
+CONFIG_I2C=y
+CONFIG_RTC=y
+CONFIG_DMA=y
+CONFIG_RTC_RTL87X3G=y
+CONFIG_RTC_ALARM=y
+CONFIG_SENSOR=y
+CONFIG_QDEC_RTL87X3G=y
+CONFIG_RTL87X3G_QDEC_X_AXIS_ENABLE=y
+CONFIG_GPIO_ENABLE_DISABLE_INTERRUPT=y
+CONFIG_SDHC_RTL87X3G_TUNING=n
+# Console Driver
+CONFIG_CONSOLE=n
+CONFIG_UART_CONSOLE=n
+# UART Driver
+CONFIG_SERIAL=n
+CONFIG_UART_INTERRUPT_DRIVEN=n
+CONFIG_UART_ASYNC_API=n
+
+#################Zephyr Tasks Config########################
+#if do fsmk, main stack size may need to increase.
+CONFIG_MAIN_STACK_SIZE=4096
+CONFIG_IDLE_STACK_SIZE=1536
+# rtk log need 252 stack size
+CONFIG_SYSTEM_WORKQUEUE_STACK_SIZE=3072
+
+#################Realtek System Config########################
+#log output by rtk
+CONFIG_LOG_RTK=y

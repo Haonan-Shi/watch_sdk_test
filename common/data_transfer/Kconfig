@@ -1,0 +1,13 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "Realtek Common Module Data Transfer"
+config REALTEK_COMMON_MODULE_DATA_TRANSFER
+    bool "Enable Realtek Common Module Data Transfer"
+    default n
+    help
+        Realtek common module data transfer support.
+endmenu

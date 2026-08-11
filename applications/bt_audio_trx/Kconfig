@@ -1,0 +1,58 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+# This loads bt_audio_trx source code config
+menu "Realtek bt_audio_trx Application"
+rsource "src/Kconfig"
+
+config SOC_SERIES_RTL87X3G
+            bool "Select RTL87X3G IC Type"
+            default y
+            help
+                Select RTL87X3G IC Type.
+
+config REALTEK_FILESYSTEM_EXFAT_SUPPORT
+            bool "Realtek Filesystem exfat support"
+            default y
+            help
+                Realtek Filesystem exfat support.
+
+choice
+        prompt "bank select"
+        default REALTEK_COMMON_SDK_BANK0
+config REALTEK_COMMON_SDK_BANK0
+        bool "build bank0 image"
+config REALTEK_COMMON_SDK_BANK1
+        bool "build bank1 image"
+endchoice
+
+choice
+        prompt "flash size select"
+        default REALTEK_COMMON_SDK_4M
+config REALTEK_COMMON_SDK_4M
+        bool "use 4M flash map"
+config REALTEK_COMMON_SDK_8M
+        bool "use 8M flash map"
+config REALTEK_COMMON_SDK_16M
+        bool "use 16M flash map"
+endchoice
+endmenu
+
+config REALTEK_APP_GUI
+		bool "Enable APP GUI Code"
+		default n
+		help
+			Enable APP GUI Code.
+			
+config REALTEK_KEY_BUTTON_8773G_ZEPHYR_CS
+		bool "Enable KEY Button Driver"
+		default n
+		help
+			Enable KEY Button Driver.
+
+menu "Zephyr Kernel"
+source "Kconfig.zephyr"
+endmenu

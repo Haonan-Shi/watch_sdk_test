@@ -1,0 +1,51 @@
+/*
+ * Copyright (c) 2026, Realtek Semiconductor Corporation
+ *
+ * SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+ */
+
+#include <zephyr/dt-bindings/pinctrl/rtl87x3g-pinctrl.h>
+#include "board_pin_assignments/rtl8763gws/board.h"
+
+&pinctrl
+{
+	uart2_default:uart2_default {
+		group1 {
+			psels = <RTL87X3G_PSEL(UART2_TX, UART2_TX_PIN, DIR_OUT, DRV_HIGH, PULL_UP)>,
+			<RTL87X3G_PSEL(UART2_RX, UART2_RX_PIN, DIR_IN, DRV_HIGH, PULL_UP)>;
+		};
+	};
+
+	uart2_sleep:uart2_sleep {
+		group1 {
+			psels = <RTL87X3G_PSEL(SW_MODE, UART2_TX_PIN, DIR_OUT, DRV_HIGH, PULL_UP)>;
+		};
+		group2 {
+			psels = <RTL87X3G_PSEL(SW_MODE, UART2_RX_PIN, DIR_IN, DRV_HIGH, PULL_UP)>;
+			wakeup-low;
+		};
+	};
+
+	sdhc0_default:sdhc0_default {
+		group1 {
+            psels = 
+			<RTL87X3G_PSEL(HS_P2_3_SDH0_CLK, P2_3, DIR_OUT, DRV_HIGH, PULL_UP)>,
+            <RTL87X3G_PSEL(HS_P2_4_SDH0_CMD, P2_4, DIR_OUT, DRV_HIGH, PULL_UP)>,
+			<RTL87X3G_PSEL(HS_P2_5_SDH0_DATA0, P2_5, DIR_OUT, DRV_HIGH, PULL_UP)>,
+			<RTL87X3G_PSEL(HS_P2_6_SDH0_DATA1, P2_6, DIR_OUT, DRV_HIGH, PULL_UP)>,
+			<RTL87X3G_PSEL(HS_P2_7_SDH0_DATA2, P2_7, DIR_OUT, DRV_HIGH, PULL_UP)>,
+			<RTL87X3G_PSEL(HS_P4_0_SDH0_DATA3, P4_0, DIR_OUT, DRV_HIGH, PULL_UP)>;
+			bias-pull-strong;
+			current-level = <1>;
+		};
+	};
+
+	i2c1_default:i2c1_default {
+		group1 {
+			psels = 
+			<RTL87X3G_PSEL(I2C1_CLK, I2C1_SCL_PIN, DIR_OUT, DRV_HIGH, PULL_UP)>,
+			<RTL87X3G_PSEL(I2C1_DAT, I2C1_SDA_PIN, DIR_OUT, DRV_HIGH, PULL_UP)>;
+			bias-pull-strong;
+		};
+	};
+};

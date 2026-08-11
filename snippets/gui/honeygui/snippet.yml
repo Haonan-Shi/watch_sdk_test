@@ -1,0 +1,4 @@
+name: honeygui
+append:
+  EXTRA_CONF_FILE: honeygui.conf
+  EXTRA_DTC_OVERLAY_FILE: honeygui.overlay

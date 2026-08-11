@@ -1,0 +1,236 @@
+/*
+ * Copyright(c) 2024, Realtek Semiconductor Corporation.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+/dts-v1/;
+#include <realtek/rtl87x3g.dtsi>
+#include "rtl87x3g_watch_rtl8773gtp-pinctrl.dtsi"
+#include "board_pin_assignments/rtl8773gtp/board.h"
+
+/delete-node/ &flash;
+/ {
+	model = "Realtek rtl8773gtp Watch NAND";
+	compatible = "realtek,rtl87x3g_watch_rtl8773gtp_nand";
+	chosen {
+		zephyr,sram = &dtcm;
+		zephyr,itcm = &itcm;
+		zephyr,flash = &psram0;
+		zephyr,code-partition = &psram_bank0_app_partition;
+/* By default, rtl87x3g uses RTK-LOG-UART(uart1) to output zephyr log.
+ * Therefore, zephyr,console and zephyr,shell-uart should be NULL to save resources.
+ */
+		// zephyr,console = &uart2;
+		// zephyr,shell-uart = &uart2;
+		zephyr,flash-controller = &fmc;
+	};
+	/* These aliases are used by soc.c */
+	aliases {
+		ftl-region = &flash_ftl_region;
+		ftl-region-storage-base = &nand_flash;
+		vp-data = &flash_bank0_ext_img0;
+		vp-data-storage-base = &nand_flash;
+		bt-host = &psram_bt_host;
+		bt-host-storage-base = &psram0;
+		nftl-region = &flash_nftl;
+	};
+
+	psram0:memory@22000000 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		reg = <0x22000000 DT_SIZE_K(4096)>;
+		psram0_for_mcu: psram0_for_mcu{
+			device_type = "psram 0 region";
+			psram0_partitions: partitions {
+				compatible = "fixed-partitions";
+				#address-cells = <1>;
+				#size-cells = <1>;
+				psram_reserved: partition@0 {
+					label = "psram-reserved-image";
+					reg = <0x0 DT_SIZE_K(8)>;
+				};
+				psram_bt_host: partition@2000 {
+					label = "psram-bt-host";
+					reg = <0x2000 DT_SIZE_K(252)>;
+				};
+				psram_config_file: partition@41000 {
+					label = "psram-config-file-image";
+					reg = <0x41000 DT_SIZE_K(5)>;
+				};
+				psram_bank0_ota_header: partition@42400 {
+					label = "psram-ota-header-image";
+					reg = <0x42400 DT_SIZE_K(1)>;
+				};
+				psram_bank0_stack_patch: partition@42800 {
+					label = "psram-stack-patch-image";
+					reg = <0x42800 DT_SIZE_K(200)>;
+				};
+				psram_bank0_system_patch: partition@74800 {
+					label = "psram-system-patch-image";
+					reg = <0x74800 DT_SIZE_K(136)>;
+				};
+				psram_bank0_app_partition: partition@96800 {
+					label = "psram-app-image";
+					reg = <0x96800 DT_SIZE_K(2048)>;
+				};
+				/* 
+				 * these images have no psram layout
+				psram_bank0_dsp_sys: partition@0 {
+					label = "psram-bank0_dsp_sys-image";
+					reg = <0x0 DT_SIZE_K(0)>;
+				};
+				bank0_dsp_app: partition@0 {
+					label = "psram-bank0_dsp_app-image";
+					reg = <0x0 DT_SIZE_K(0)>;
+				};
+				psram_bank0_dsp_cfg: partition@0 {
+					label = "psram-bank0_dsp_cfg-image";
+					reg = <0x0 DT_SIZE_K(0)>;
+				};
+				psram_bank0_app_cfg: partition@37e800 {
+					label = "psram-bank0_app_cfg-image";
+					reg = <0x0 DT_SIZE_K(0)>;
+				};
+				psram_bank0_ext_img0: partition@380800 {
+					label = "psram-bank0_ext_img0-image";
+					reg = <0x0 DT_SIZE_K(0)>;
+				};
+				*/
+				psram_app_defined_section: partition@296800 {
+					label = "psram-app-defined-section";
+					reg = <0x296800 DT_SIZE_K(60)>;
+				};
+			};
+		};
+	};
+
+	psram1:psram1 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		/* reserve 512KB for dsp. 
+		 * if enable, psram1_for_mcu address should be 0x24080000
+		 * and size should be 3584KByte*/
+
+		/* 
+		psram1_for_dsp: memory@24000000{
+			device_type = "psram 1 region for dsp";
+			reg = <0x24000000 DT_SIZE_K(512)>;
+		};
+		*/
+		psram1_for_mcu: memory@24000000{
+			device_type = "psram 1 region";
+			reg = <0x24000000 DT_SIZE_K(4096)>;
+		};
+	};
+
+	nand_flash: flash@80000000
+	{
+		#address-cells = <1>;
+		#size-cells = <1>;
+		reg = <0x80000000 DT_SIZE_M(128)>;
+		flash_partitions:partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			flash_bt_host: partition@100000 {
+				label = "flash-bt-host";
+				reg = <0x100000 DT_SIZE_K(252)>;
+			};
+			flash_config_file: partition@140000 {
+				label = "flash-config-file-image";
+				reg = <0x140000 DT_SIZE_K(5)>;
+			};
+			flash_bank0_ota_header: partition@180000 {
+				label = "flash-ota-header-image";
+				reg = <0x180000 DT_SIZE_K(4608)>;
+			};
+			flash_bank0_stack_patch: partition@1c0000 {
+				label = "flash-stack-patch-image";
+				reg = <0x1C0000 DT_SIZE_K(200)>;
+			};
+			flash_bank0_system_patch: partition@200000 {
+				label = "flash-system-patch-image";
+				reg = <0x200000 DT_SIZE_K(136)>;
+			};
+			flash_bank0_app_partition: partition@240000 {
+				label = "flash-app-image";
+				reg = <0x240000 DT_SIZE_K(2000)>;
+			};
+			flash_bank0_dsp_sys: partition@440000 {
+				label = "flash-bank0_dsp_sys-image";
+				reg = <0x440000 DT_SIZE_K(632)>;
+			};
+			flash_bank0_dsp_app: partition@500000 {
+				label = "flash-bank0_dsp_app-image";
+				reg = <0x500000 DT_SIZE_K(256)>;
+			};
+			flash_bank0_dsp_cfg: partition@540000 {
+				label = "flash-bank0_dsp_cfg-image";
+				reg = <0x540000 DT_SIZE_K(40)>;
+			};
+			flash_bank0_app_cfg: partition@580000 {
+				label = "flash-bank0_app_cfg-image";
+				reg = <0x580000 DT_SIZE_K(8)>;
+			};
+			flash_bank0_ext_img0: partition@5c0000 {
+				label = "flash-bank0_ext_img0-image";
+				reg = <0x5C0000 DT_SIZE_K(200)>;
+			};
+			flash_ota_tmp: partition@600000 {
+				label = "flash-ota_tmp-image";
+				reg = <0x600000 DT_SIZE_K(2048)>;
+			};
+			flash_userdata1: partition@800000 {
+				label = "flash-userdata1-image";
+				reg = <0x800000 DT_SIZE_K(11264)>;
+			};
+			flash_ftl_region: partition@1300000 {
+				label = "realtek-flash-ftl-region";
+				reg = <0x1300000 DT_SIZE_K(108544)>;
+				flash_nftl: flash_nftl{
+					compatible = "realtek,nftl";
+					size = <DT_SIZE_K(32)>;
+				};
+			};
+		};
+	};
+};
+
+&gpioa {
+	status = "okay";
+};
+
+&gpiob {
+	status = "okay";
+};
+
+&dma0 {
+    status = "okay";
+};
+
+&rtc {
+    status = "okay";
+	channels = <1>;
+    prescaler = <1>;
+};
+
+&i2c1 {
+	pinctrl-0 = <&i2c1_default>;
+    pinctrl-names = "default";
+	clock-frequency = <I2C_BITRATE_FAST>;
+	status = "okay";
+};
+
+&cpu {
+	clock-frequency = <40000000>;
+};
+
+&uart2 {
+	pinctrl-0 = <&uart2_default>;
+	pinctrl-1 = <&uart2_sleep>;
+	pinctrl-names = "default", "sleep";
+	status = "disabled";
+	current-speed = <2000000>;
+	parity = "none";
+	stop-bits = "1";
+	data-bits = <8>;
+};

@@ -1,0 +1,14 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+board:
+  name: rtl87x3g_bt_audio_trx
+  vendor: realtek
+  socs:
+  - name: rtl8773gtp
+  - name: rtl8783gbf
+  - name: rtl8763gws
+  - name: rtl8763gts

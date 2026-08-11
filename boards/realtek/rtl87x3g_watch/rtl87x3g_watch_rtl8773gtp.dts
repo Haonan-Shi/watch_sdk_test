@@ -1,0 +1,189 @@
+/*
+ * Copyright(c) 2024, Realtek Semiconductor Corporation.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+/dts-v1/;
+#include <realtek/rtl87x3g.dtsi>
+#include "rtl87x3g_watch_rtl8773gtp-pinctrl.dtsi"
+#include "board_pin_assignments/rtl8773gtp/board.h"
+/ {
+	model = "Realtek rtl8773gtp Watch";
+	compatible = "realtek,rtl87x3g_watch_rtl8773gtp";
+	chosen {
+		zephyr,sram = &dtcm;
+		zephyr,itcm = &itcm;
+		zephyr,flash = &flash;
+		zephyr,code-partition = &bank0_app_partition;
+/* By default, rtl87x3g uses RTK-LOG-UART(uart1) to output zephyr log.
+ * Therefore, zephyr,console and zephyr,shell-uart should be NULL to save resources.
+ */
+		// zephyr,console = &uart2;
+		// zephyr,shell-uart = &uart2;
+		zephyr,flash-controller = &fmc;
+	};
+	/* These aliases are used by soc.c */
+	aliases {
+		ftl-region = &ftl_region;
+		ftl-region-storage-base = &flash;
+		vp-data = &bank0_ext_img0;
+		vp-data-storage-base = &flash;
+		bt-host = &bt_host;
+		bt-host-storage-base = &flash;
+	};
+
+	psram0:psram0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		psram0_for_mcu: memory@22000000{
+			device_type = "psram 0 region";
+			reg = <0x22000000 DT_SIZE_K(4096)>;
+		};
+	};
+
+	psram1:psram1 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		/* reserve 512KB for dsp. 
+		 * if enable, psram1_for_mcu address should be 0x24080000
+		 * and size should be 3584KByte*/
+
+		/* 
+		psram1_for_dsp: memory@24000000{
+			device_type = "psram 1 region for dsp";
+			reg = <0x24000000 DT_SIZE_K(512)>;
+		};
+		*/
+		psram1_for_mcu: memory@24000000{
+			device_type = "psram 1 region";
+			reg = <0x24000000 DT_SIZE_K(4096)>;
+		};
+	};
+};
+
+&flash
+{
+	reg = <0x70000000 DT_SIZE_M(16)>;
+	partitions: partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		reserved: partition@0 {
+			label = "reserved-image";
+			reg = <0x0 DT_SIZE_K(8)>;
+		};
+		config_file: partition@2000 {
+			label = "config-file-image";
+			reg = <0x2000 DT_SIZE_K(4)>;
+		};
+		boot_patch_0: partition@4000 {
+			label = "boot-patch-0-image";
+			reg = <0x4000 DT_SIZE_K(12)>;
+		};
+		boot_patch_1: partition@7000 {
+			label = "boot-patch-1-image";
+			reg = <0x7000 DT_SIZE_K(12)>;
+		};
+		bt_host: partition@a000 {
+			label = "bt_host";
+			reg = <0xA000 DT_SIZE_K(252)>;
+		};
+		bank0_ota_header: partition@49000 {
+			label = "ota-header-image";
+			reg = <0x49000 DT_SIZE_K(1)>;
+		};
+		bank0_stack_patch: partition@4a000 {
+			label = "stack-patch-image";
+			reg = <0x4A000 DT_SIZE_K(200)>;
+		};
+		bank0_system_patch: partition@7c000 {
+			label = "system-patch-image";
+			reg = <0x7c000 DT_SIZE_K(22)>;
+		};
+		bank0_app_partition: partition@9e000 {
+			label = "app-image";
+			reg = <0x9E000 DT_SIZE_K(1536)>;
+		};
+		bank0_dsp_sys: partition@21e000 {
+			label = "bank0_dsp_sys-image";
+			reg = <0x21E000 DT_SIZE_K(632)>;
+		};
+		bank0_dsp_app: partition@2bc000 {
+			label = "bank0_dsp_app-image";
+			reg = <0x2BC000 DT_SIZE_K(256)>;
+		};
+		bank0_dsp_cfg: partition@2fc000 {
+			label = "bank0_dsp_cfg-image";
+			reg = <0x2FC000 DT_SIZE_K(40)>;
+		};
+		bank0_app_cfg: partition@306000 {
+			label = "bank0_app_cfg-image";
+			reg = <0x306000 DT_SIZE_K(8)>;
+		};
+		bank0_ext_img0: partition@308000 {
+			label = "bank0_ext_img0-image";
+			reg = <0x308000 DT_SIZE_K(200)>;
+		};
+
+		ftl_region: partition@33a000 {
+			label = "realtek-ftl-region";
+			reg = <0x33A000 DT_SIZE_K(32)>; 
+		};
+		partition_userdata1: partition@4d1000{
+			label = "realtek-userdata1";
+			reg = <0x4D1000 DT_SIZE_M(11)>; 
+		};
+	};
+};
+
+&gpioa {
+	status = "okay";
+};
+
+&gpiob {
+	status = "okay";
+};
+
+&dma0 {
+    status = "okay";
+};
+
+&rtc {
+    status = "okay";
+	channels = <1>;
+    prescaler = <1>;
+};
+
+&sdhc0 {
+    pin-group = <0>;
+    bus-width = <1>;
+	max-bus-freq = <40000000>;
+	/*P3_4       26  /*!< GPIOA6 */ 
+	pwr-gpios = <SD_SDHC_PWR_GPIO_PIN GPIO_ACTIVE_HIGH>;
+    pinctrl-0 = <&sdhc0_default>;
+	pinctrl-1 = <&sdhc0_sleep>;
+    pinctrl-names = "default", "sleep";
+	status = "okay";
+};
+
+&i2c1 {
+	pinctrl-0 = <&i2c1_default>;
+	pinctrl-1 = <&i2c1_sleep>;
+    pinctrl-names = "default", "sleep";
+	clock-frequency = <I2C_BITRATE_FAST>;
+	status = "okay";
+};
+
+&cpu {
+	clock-frequency = <40000000>;
+};
+
+&uart2 {
+	pinctrl-0 = <&uart2_default>;
+	pinctrl-1 = <&uart2_sleep>;
+	pinctrl-names = "default", "sleep";
+	status = "disabled";
+	current-speed = <2000000>;
+	parity = "none";
+	stop-bits = "1";
+	data-bits = <8>;
+};

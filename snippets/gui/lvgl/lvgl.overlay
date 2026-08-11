@@ -1,0 +1,46 @@
+/*
+ * Copyright(c) 2026, Realtek Semiconductor Corporation.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <zephyr/dt-bindings/gpio/realtek-rtl87x3g-gpio.h>
+#include <dt-bindings/pinctrl/rtl87x3g-pinctrl.h>
+#include <rtl87x3g-display-lcd.dtsi>
+
+/delete-node/ &sram;
+/delete-node/ &heap_sram;
+
+&display_lcd {
+    status = "okay";
+};
+
+&i2c1 {
+    touch_device: touch_chsc6417@2e {
+        compatible = "chipsemi,chsc6417";
+        reg = <0x2E>;
+        irq-gpios = <TP_INT_GPIO_PIN GPIO_ACTIVE_HIGH>;
+        rst-gpios = <TP_RST_GPIO_PIN GPIO_ACTIVE_HIGH>;
+        gesture-release-timeout-ms = <30>;
+        status = "okay";
+    };
+};
+
+/ {
+    chosen {
+        zephyr,display = &display_lcd;
+    };
+
+    sram {
+        sram: memory@20020000 {
+            device_type = "sram region";
+            compatible = "zephyr,memory-region", "mmio-sram";
+            reg = <0x20020000 DT_SIZE_K(96)>;
+            zephyr,memory-region = "SRAM";
+        };
+        heap_sram: memory@20038000 {
+            device_type = "heap sram region";
+            reg = <0x20038000 DT_SIZE_K(64)>;
+        };
+    };
+};
