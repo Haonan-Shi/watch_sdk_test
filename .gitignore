@@ -1,111 +1,36 @@
-*.o
-*.a
-*.d
-*.cmd
-*.log
-*.pyc
-*.swp
-*.swo
-*~
-
-# Emacs
-\#*\#
-
-bin*/
+# Build directory (Zephyr build output)
+build/
+# in case of using a different build directory
+*build/
 build*/
-!doc/build/
-!tests/drivers/build_all
-!scripts/pylib/build_helpers
-cscope.*
-.dir
 
+# app post build files
+bin/
+honeygui_userdata/
+applications/deskmate/
+applications/eBadge/
 
-/*.patch
+# Genrated file from Zephyr
+VERSION
 
-# The .cache directory will be used to cache toolchain capabilities if
-# no suitable out-of-tree directory is found.
-.cache
+# claude settings
+**/settings.local.json
+CLAUDE.local.md
 
-outdir
-outdir-*
-scripts/basic/fixdep
-scripts/gen_idt/gen_idt
-coverage-report
-doc-coverage.info
-doc/_build
-doc/doxygen
-doc/xml
-doc/html
-doc/boards
-doc/samples
-doc/latex
-doc/themes/zephyr-docs-theme
-sanity-out*
-twister-out*
-bsim_out
-bsim_bt_out
-myresults.xml
-tests/RunResults.xml
-scripts/grub
-doc/reference/kconfig/*.rst
-doc/doc.warnings
-.*project
-.settings
-.envrc
-.vscode
-hide-defaults-note
-venv
+# doc build 
+doc/_build/
+doc/_static/js/ga_config.js
+doc/index.rst
+
+# scripts
+script/build_log.txt
+
+#python cache 
+__pycache__/
 .venv
-.DS_Store
-.clangd
-new.info
 
-# Cargo drops lock files in projects to capture resolved dependencies.
-# We don't want to record these.
-Cargo.lock
-
-# Cargo encourages a .cargo/config.toml file to symlink to a generated file.  Don't save these.
-.cargo/
-
-# Normal west builds will place the Rust target directory under the build directory.  However,
-# sometimes IDEs and such will litter these target directories as well.
-target/
-
-# CI output
-compliance.xml
-_error.types
-
-# Tag files
-GPATH
-GRTAGS
-GTAGS
-TAGS
-tags
-
-.idea
-
-# from check_compliance.py
-BinaryFiles.txt
-BoardYml.txt
-Checkpatch.txt
-ClangFormat.txt
-DevicetreeBindings.txt
-GitDiffCheck.txt
-Gitlint.txt
-Identity.txt
-ImageSize.txt
-Kconfig.txt
-KconfigBasic.txt
-KconfigBasicNoModules.txt
-KconfigHWMv2.txt
-KeepSorted.txt
-MaintainersFormat.txt
-ModulesMaintainers.txt
-Nits.txt
-Pylint.txt
-SphinxLint.txt
-TextEncoding.txt
-YAMLLint.txt
+#mpcli log
+*.log
 
 # --- gh_release working metadata (never commit / never push) ---
 /staging/
@@ -117,3 +42,8 @@ YAMLLint.txt
 !/bin/README
 /tools/*
 !/tools/README
+!/tools/.west
+!/tools/Gadgets
+!/tools/flash
+!/tools/meta_tools
+!/tools/mpcli
