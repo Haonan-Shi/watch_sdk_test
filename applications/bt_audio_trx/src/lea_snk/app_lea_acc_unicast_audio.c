@@ -53,7 +53,7 @@
 #define CIS_PERMIT_MIN_PD_LOW_LATENCY_DELAY 4500
 #define CIS_PERMIT_MIN_PD_DELAY 20000
 
-#define UPSTREAM_ALGO_AUDIO     1
+#define UPSTREAM_ALGO_AUDIO     0
 
 #define LEA_RECORD_PREQUEUE_PKT_NUM     4
 
@@ -76,8 +76,9 @@ typedef struct uca_iso_elem
 } T_UCA_ISO_ELEM;
 
 static bool app_lea_uca_diff_path = true;
-static T_AUDIO_EFFECT_INSTANCE app_lea_uca_eq = NULL;
-static bool app_lea_uca_eq_enabled = false;
+static T_AUDIO_EFFECT_INSTANCE app_lea_uca_spk_eq = NULL;
+static bool app_lea_uca_spk_eq_enabled = false;
+static T_AUDIO_EFFECT_INSTANCE app_lea_uca_mic_eq = NULL;
 static T_APP_LE_LINK *app_lea_uca_active_stream_link = NULL;
 static T_OS_QUEUE app_lea_uca_left_ch_queue;
 static T_OS_QUEUE app_lea_uca_right_ch_queue;
@@ -785,17 +786,17 @@ static uint16_t app_lea_uca_ble_audio_cback(T_LE_AUDIO_MSG msg, void *buf)
 
 T_AUDIO_EFFECT_INSTANCE app_lea_uca_get_eq_instance(void)
 {
-    return app_lea_uca_eq;
+    return app_lea_uca_spk_eq;
 }
 
 T_AUDIO_EFFECT_INSTANCE *app_lea_uca_p_eq_instance(void)
 {
-    return &app_lea_uca_eq;
+    return &app_lea_uca_spk_eq;
 }
 
 bool *app_lea_uca_get_eq_abled(void)
 {
-    return &app_lea_uca_eq_enabled;
+    return &app_lea_uca_spk_eq_enabled;
 }
 
 bool app_lea_uca_get_diff_path(void)
@@ -889,9 +890,93 @@ void app_lea_uca_eq_release(T_AUDIO_EFFECT_INSTANCE *eq_instance)
     }
 }
 
+void app_lea_uca_eq_detach(T_AUDIO_STREAM_TYPE stream_type)
+{
+    //Detach EQ effect
+    if (stream_type == AUDIO_STREAM_TYPE_PLAYBACK)
+    {
+        app_lea_uca_eq_release(&app_lea_uca_spk_eq);
+    }
+    else
+    {
+        if (stream_type == AUDIO_STREAM_TYPE_RECORD)
+        {
+            app_lea_uca_eq_release(&app_lea_uca_mic_eq);
+        }
+        else if (stream_type == AUDIO_STREAM_TYPE_VOICE)
+        {
+            app_lea_uca_eq_release(&app_lea_uca_spk_eq);
+            app_lea_uca_eq_release(&app_lea_uca_mic_eq);
+            app_eq_change_audio_eq_mode(true);
+        }
+    }
+
+    APP_PRINT_TRACE1("app_lea_uca_eq_detach: stream_type %d", stream_type);
+}
+
+void app_lea_uca_voice_eq_setting(T_AUDIO_EFFECT_INSTANCE *eq_spk_instance,
+                                  T_AUDIO_EFFECT_INSTANCE *eq_mic_instance,
+                                  T_AUDIO_TRACK_HANDLE audio_track_handle)
+{
+    if (*eq_spk_instance)
+    {
+        eq_release(*eq_spk_instance);
+    }
+
+    if (*eq_mic_instance)
+    {
+        eq_release(*eq_mic_instance);
+    }
+
+    app_eq_change_audio_eq_mode(true);
+
+    app_eq_idx_check_accord_mode();
+
+    *eq_spk_instance = app_eq_create(EQ_CONTENT_TYPE_VOICE_OUT, EQ_STREAM_TYPE_VOICE, SPK_SW_EQ,
+                                     app_db.spk_eq_mode, app_cfg_nv.eq_idx);
+
+    if (*eq_spk_instance != NULL)
+    {
+        eq_enable(*eq_spk_instance);
+        audio_track_effect_attach(audio_track_handle, *eq_spk_instance);
+    }
+
+    *eq_mic_instance = app_eq_create(EQ_CONTENT_TYPE_VOICE_IN, EQ_STREAM_TYPE_VOICE, MIC_SW_EQ,
+                                     VOICE_MIC_MODE, app_cfg_nv.eq_idx);
+
+    if (*eq_mic_instance != NULL)
+    {
+        eq_enable(*eq_mic_instance);
+        audio_track_effect_attach(audio_track_handle, *eq_mic_instance);
+    }
+}
+
+void app_lea_uca_record_eq_setting(T_AUDIO_EFFECT_INSTANCE *eq_instance,
+                                   T_AUDIO_TRACK_HANDLE audio_track_handle)
+{
+    if (*eq_instance)
+    {
+        eq_release(*eq_instance);
+    }
+
+    *eq_instance = app_eq_create(EQ_CONTENT_TYPE_RECORD, EQ_STREAM_TYPE_RECORD, MIC_SW_EQ,
+                                 VOICE_MIC_MODE, 0);
+
+    if (*eq_instance != NULL)
+    {
+        eq_enable(*eq_instance);
+        audio_track_effect_attach(audio_track_handle, *eq_instance);
+    }
+}
+
 void app_lea_uca_eq_setting(T_AUDIO_EFFECT_INSTANCE *eq_instance,  bool *audio_eq_enabled,
                             T_AUDIO_TRACK_HANDLE audio_track_handle)
 {
+    if (*eq_instance)
+    {
+        eq_release(*eq_instance);
+    }
+
     app_eq_idx_check_accord_mode();
     *eq_instance = app_eq_create(EQ_CONTENT_TYPE_AUDIO, EQ_STREAM_TYPE_AUDIO, SPK_SW_EQ,
                                  app_db.spk_eq_mode,
@@ -930,6 +1015,64 @@ void app_lea_uca_eq_setting(T_AUDIO_EFFECT_INSTANCE *eq_instance,  bool *audio_e
     }
 }
 
+void app_lea_uca_eq_attach(T_AUDIO_STREAM_TYPE stream_type, T_AUDIO_TRACK_HANDLE track_handle)
+{
+    // Attach EQ effect
+    if (stream_type == AUDIO_STREAM_TYPE_PLAYBACK)
+    {
+        app_lea_uca_eq_setting(&app_lea_uca_spk_eq, &app_lea_uca_spk_eq_enabled,
+                               track_handle);
+    }
+    else
+    {
+        if (stream_type == AUDIO_STREAM_TYPE_RECORD)
+        {
+            app_lea_uca_record_eq_setting(&app_lea_uca_mic_eq, track_handle);
+        }
+        else if (stream_type == AUDIO_STREAM_TYPE_VOICE)
+        {
+            app_lea_uca_voice_eq_setting(&app_lea_uca_spk_eq, &app_lea_uca_mic_eq, track_handle);
+        }
+    }
+
+    APP_PRINT_TRACE2("app_lea_uca_eq_attach: stream_type %d, track_handle 0x%x",
+                     stream_type, track_handle);
+}
+
+void app_lea_uca_sidetone_attach(T_LEA_ASE_ENTRY *p_ase_entry)
+{
+    if (p_ase_entry == NULL || p_ase_entry->track_handle == NULL)
+    {
+        return;
+    }
+
+    if (p_ase_entry->stream_type == AUDIO_STREAM_TYPE_VOICE ||
+        p_ase_entry->stream_type == AUDIO_STREAM_TYPE_RECORD)
+    {
+        if (app_dsp_cfg_sidetone.hw_enable)
+        {
+            audio_volume_in_unmute(p_ase_entry->stream_type);
+        }
+
+        p_ase_entry->sidetone_instance = app_sidetone_attach(p_ase_entry->track_handle,
+                                                             app_dsp_cfg_sidetone);
+    }
+}
+
+void app_lea_uca_sidetone_detach(T_LEA_ASE_ENTRY *p_ase_entry)
+{
+    if (p_ase_entry == NULL || p_ase_entry->track_handle == NULL)
+    {
+        return;
+    }
+
+    if (p_ase_entry->stream_type == AUDIO_STREAM_TYPE_VOICE ||
+        p_ase_entry->stream_type == AUDIO_STREAM_TYPE_RECORD)
+    {
+        app_sidetone_detach(p_ase_entry->track_handle, p_ase_entry->sidetone_instance);
+    }
+}
+
 static bool app_lea_uca_free_link(T_APP_LE_LINK *p_link)
 {
     uint8_t i;
@@ -946,18 +1089,11 @@ static bool app_lea_uca_free_link(T_APP_LE_LINK *p_link)
 #if F_APP_MALLEUS_SUPPORT
                 malleus_release(&lea_malleus_instance);
 #endif
+                app_lea_uca_sidetone_detach(p_ase_entry);
                 audio_track_release(p_ase_entry->track_handle);
             }
 
-            //Detach audio effect
-            if (p_ase_entry->stream_type == AUDIO_STREAM_TYPE_PLAYBACK)
-            {
-                app_lea_uca_eq_release(&app_lea_uca_eq);
-            }
-            else //AUDIO_STREAM_TYPE_VOICE, AUDIO_STREAM_TYPE_RECORD
-            {
-                app_sidetone_detach(p_ase_entry->track_handle, p_ase_entry->sidetone_instance);
-            }
+            app_lea_uca_eq_detach(p_ase_entry->stream_type);
 
             memset(p_ase_entry, 0, sizeof(T_LEA_ASE_ENTRY));
         }
@@ -1082,9 +1218,11 @@ static void app_lea_umr_clear_playback_track_handle(T_APP_LE_LINK *p_link)
 #if F_APP_MALLEUS_SUPPORT
                 malleus_release(&lea_malleus_instance);
 #endif
+                app_lea_uca_sidetone_detach(&p_ase_entry);
                 audio_track_release(p_ase_entry.track_handle);
                 p_ase_entry.track_handle = NULL;
                 p_ase_entry.track_write_len = 0;
+                app_lea_uca_eq_detach(p_ase_entry.stream_type);
             }
         }
     }
@@ -1467,7 +1605,8 @@ static void app_lea_uca_track_create(T_APP_LE_LINK *p_link, T_LEA_ASE_ENTRY *p_a
             lea_malleus_instance = malleus_create(p_ase_entry->track_handle);
         }
 #endif
-
+        app_lea_uca_eq_attach(p_ase_entry->stream_type, p_ase_entry->track_handle);
+        app_lea_uca_sidetone_attach(p_ase_entry);
         audio_track_start(p_ase_entry->track_handle);
     }
     else
@@ -1492,9 +1631,11 @@ static void app_lea_uca_track_release(T_APP_LE_LINK *p_link, T_LEA_ASE_ENTRY *p_
 #if F_APP_MALLEUS_SUPPORT
         malleus_release(&lea_malleus_instance);
 #endif
+        app_lea_uca_sidetone_detach(p_ase_entry);
         audio_track_release(p_ase_entry->track_handle);
         p_ase_entry->track_handle = NULL;
         p_ase_entry->track_write_len = 0;
+        app_lea_uca_eq_detach(p_ase_entry->stream_type);
     }
 }
 
@@ -1701,7 +1842,9 @@ static void app_lea_uca_ase_ctrl(T_LEA_LINK_EVENT event, T_APP_LE_LINK *p_link)
 #if F_APP_MALLEUS_SUPPORT
                 malleus_release(&lea_malleus_instance);
 #endif
+                app_lea_uca_sidetone_detach(p_ase_entry);
                 audio_track_release(p_ase_entry->track_handle);
+                app_lea_uca_eq_detach(p_ase_entry->stream_type);
             }
         }
         break;
@@ -1710,25 +1853,12 @@ static void app_lea_uca_ase_ctrl(T_LEA_LINK_EVENT event, T_APP_LE_LINK *p_link)
         {
             if (p_ase_entry != NULL)
             {
-                T_AUDIO_STREAM_TYPE stream_type = p_ase_entry->stream_type;
-
                 if (p_ase_entry->path_direction == DATA_PATH_OUTPUT_FLAG)
                 {
                     p_link->stream_channel_allocation &= ~p_ase_entry->codec_cfg.audio_channel_allocation;
                 }
 
-                //Detach audio effect
-                if (stream_type != AUDIO_STREAM_TYPE_PLAYBACK)
-                {
-                    app_sidetone_detach(p_ase_entry->track_handle, p_ase_entry->sidetone_instance);
-                }
-
                 app_lea_ascs_free_ase_entry(p_ase_entry);
-
-                if (stream_type == AUDIO_STREAM_TYPE_PLAYBACK)
-                {
-                    app_lea_uca_eq_release(&app_lea_uca_eq);
-                }
             }
         }
         break;
@@ -2090,20 +2220,7 @@ static void app_lea_uca_link_streaming(T_APP_LE_LINK *p_link, uint8_t event, voi
 
             if (is_ascs_release)
             {
-                T_AUDIO_STREAM_TYPE stream_type = p_ase_entry->stream_type;
-
-                //Detach audio effect
-                if (stream_type != AUDIO_STREAM_TYPE_PLAYBACK)
-                {
-                    app_sidetone_detach(p_ase_entry->track_handle, p_ase_entry->sidetone_instance);
-                }
-
                 app_lea_ascs_free_ase_entry(p_ase_entry);
-
-                if (stream_type == AUDIO_STREAM_TYPE_PLAYBACK)
-                {
-                    app_lea_uca_eq_release(&app_lea_uca_eq);
-                }
 
                 app_lea_uca_link_state_change(p_link, LEA_LINK_CONNECTED);
             }
@@ -2553,33 +2670,6 @@ static void app_lea_uca_audio_cback(T_AUDIO_EVENT event_type, void *event_buf, u
 
             if ((p_link == NULL) || (p_ase_entry == NULL))
             {
-                break;
-            }
-
-            switch (param->track_state_changed.state)
-            {
-            case AUDIO_TRACK_STATE_STARTED:
-                {
-                    //Attach audio effect
-                    if (stream_type == AUDIO_STREAM_TYPE_PLAYBACK)
-                    {
-                        app_lea_uca_eq_setting(&app_lea_uca_eq, &app_lea_uca_eq_enabled,
-                                               p_ase_entry->track_handle);
-                    }
-                    else //AUDIO_STREAM_TYPE_VOICE, AUDIO_STREAM_TYPE_RECORD
-                    {
-                        if (app_dsp_cfg_sidetone.hw_enable)
-                        {
-                            audio_volume_in_unmute(stream_type);
-                        }
-
-                        p_ase_entry->sidetone_instance = app_sidetone_attach(p_ase_entry->track_handle,
-                                                                             app_dsp_cfg_sidetone);
-                    }
-                }
-                break;
-
-            default:
                 break;
             }
 

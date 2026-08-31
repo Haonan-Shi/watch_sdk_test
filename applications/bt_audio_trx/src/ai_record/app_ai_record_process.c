@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
  */
 
+
+
 #if CONFIG_REALTEK_APP_AI_RECORD
 #include "string.h"
 #include <stdlib.h>
@@ -20,6 +22,7 @@
 #include "app_dsp_cfg.h"
 #include "nrec.h"
 #include "bt_types.h"
+#include "app_flags.h"
 
 
 #define AI_RECORD_NUM_OF_PKT           (5)

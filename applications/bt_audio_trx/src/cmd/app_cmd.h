@@ -455,7 +455,9 @@ typedef enum
     CMD_RSV4                            = 0x0A0A,
     CMD_IO_PIN_PULL_HIGH                = 0x0A0B,
     CMD_ENTER_BAT_OFF_MODE              = 0x0A0C,
+    CMD_USBH_AUDIO_SET_PARAM            = 0x0A0D,
     CMD_TRI_DONGLE_CMD_LIST             = 0x0A0E,
+    CMD_USBH_AUDIO_CONTROL              = 0x0A0F,
 
     //for HCI command
     CMD_ANC_VENDOR_COMMAND              = 0x0B00,
@@ -654,6 +656,7 @@ typedef enum
     CMD_GCSC_DISCOVER_ALL               = 0x314C,
     /* spi command */
     CMD_SPI_INIT                        = 0x3200,
+    CMD_SPI_TCP_TP_TEST                 = 0x8441, /* SPI+TCP throughput test (kept in sync with watch) */
     /* a2dp transfer command */
     CMD_A2DP_XMIT_ROUTE_OUT_CTRL        = 0x3220,
     CMD_A2DP_XMIT_AUDIO                 = 0x3221,
@@ -706,6 +709,9 @@ typedef enum
     CMD_FS_CREATE_FILE                  = 0x3341,
     CMD_FS_WRITE_FILE                   = 0x3342,
     CMD_FS_CLOSE_FILE                   = 0x3343,
+#if F_APP_FS_FORMAT_SUPPORT
+    CMD_FS_FORMAT                       = 0x3344,
+#endif
     CMD_FS_END                          = 0x3348,
 
     CMD_FLASH_CHECK_RESULT              = 0x031D,
@@ -855,6 +861,8 @@ typedef enum
     CMD_AI_RECORD_APP_RTSP_START            = 0x843C,
     CMD_AI_RECORD_APP_RTSP_STOP             = 0x843D,
     CMD_AI_RECORD_APP_SET_MODE              = 0x843E,
+    CMD_AI_RECORD_WIFI_SDIO_TX_TEST         = 0x843F,
+    CMD_AI_RECORD_WIFI_SPI_TX_TEST          = 0x8438, //eMMC -> SPI transmit test
 #endif
 #if CONFIG_REALTEK_APP_AI_AUTH
     CMD_START_AUTH                      = 0x8432, //used

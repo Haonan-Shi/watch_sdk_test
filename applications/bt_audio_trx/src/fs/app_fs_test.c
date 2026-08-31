@@ -81,6 +81,61 @@ void app_fs_test_handle_cmd_set(uint8_t app_idx, uint8_t cmd_path, uint8_t *cmd_
         }
         break;
 
+#if F_APP_FS_FORMAT_SUPPORT
+    case CMD_FS_FORMAT:
+        {
+            if (cmd_len >= 3)
+            {
+                uint8_t fmt_type = cmd_ptr[2];
+                uint32_t fmt_opt;
+                uint8_t rpt[2];
+
+                switch (fmt_type)
+                {
+                case 0:
+                    rpt[0] = 0x10;
+                    rpt[1] = 0x02;
+#if CONFIG_FS_FATFS_EXFAT
+                    rpt[1] |= 0x01;
+#endif
+                    APP_PRINT_INFO1("CMD_FS_FORMAT: query caps=0x%x", rpt[1]);
+                    app_cmd_set_event_ack(cmd_path, app_idx, ack_pkt);
+                    app_report_event(CMD_PATH_UART, EVENT_FS_MOUNT_STATUS, 0, rpt, sizeof(rpt));
+                    break;
+
+                case 1:
+                    fmt_opt = APP_FS_FMT_EXFAT;
+                    APP_PRINT_INFO0("CMD_FS_FORMAT: format exFAT");
+                    app_cmd_set_event_ack(cmd_path, app_idx, ack_pkt);
+                    app_fs_format(fmt_opt);
+                    break;
+
+                case 2:
+                    fmt_opt = APP_FS_FMT_FAT32;
+                    APP_PRINT_INFO0("CMD_FS_FORMAT: format FAT32");
+                    app_cmd_set_event_ack(cmd_path, app_idx, ack_pkt);
+                    app_fs_format(fmt_opt);
+                    break;
+
+                case 3:
+                default:
+                    fmt_opt = APP_FS_FMT_AUTO;
+                    APP_PRINT_INFO0("CMD_FS_FORMAT: format auto");
+                    app_cmd_set_event_ack(cmd_path, app_idx, ack_pkt);
+                    app_fs_format(fmt_opt);
+                    break;
+                }
+            }
+            else
+            {
+                APP_PRINT_INFO0("CMD_FS_FORMAT: format exFAT (default)");
+                app_cmd_set_event_ack(cmd_path, app_idx, ack_pkt);
+                app_fs_format(APP_FS_FMT_EXFAT);
+            }
+        }
+        break;
+#endif
+
     default:
         break;
     }

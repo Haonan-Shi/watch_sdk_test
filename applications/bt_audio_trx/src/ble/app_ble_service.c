@@ -18,6 +18,10 @@
 #include "app_cmd.h"
 
 #include "app_main.h"
+
+#if CONFIG_REALTEK_APP_AI_RECORD
+#include "app_ai_record_file_trans.h"
+#endif
 #include "app_transfer.h"
 #include "app_cfg.h"
 #include "bas.h"
@@ -92,6 +96,12 @@ static T_APP_RESULT common_cb(T_SERVER_ID service_id, void *p_data)
         {
             APP_PRINT_ERROR0("gatt_svc_handle_profile_data_cmpl failed");
         }
+
+#if CONFIG_REALTEK_APP_AI_RECORD
+        /* Notify the file-transport module that a send completed so it can
+         * un-stall its push timer (if it was waiting on TX credits). */
+        ai_rec_trans_notify_send_complete(p_para->event_data.send_data_result.service_id);
+#endif
 
 #if F_APP_THROUGHPUT_SERVER_SUPPORT
         if (p_para->event_data.send_data_result.service_id == tp_svc_id)
@@ -396,7 +406,7 @@ static T_APP_RESULT app_ble_service_dis_srv_cb(T_SERVER_ID service_id, void *p_d
             if (p_dis_cb_data->msg_data.read_value_index == DIS_READ_FIRMWARE_REV_INDEX)
             {
 #if CONFIG_REALTEK_GFPS_FEATURE_SUPPORT
-                app_gfps_read_firmware_version();
+                app_result = app_gfps_read_firmware_version();
 #endif
             }
             else if (p_dis_cb_data->msg_data.read_value_index == DIS_READ_PNP_ID_INDEX)
@@ -697,6 +707,10 @@ void app_ble_service_init(void)
 
 #if F_APP_THROUGHPUT_SERVER_SUPPORT
     server_num += 2;
+#endif
+
+#if CONFIG_REALTEK_APP_AI_RECORD
+    server_num++;  /* record-trans GATT service registered from app_ai_record_init() */
 #endif
 
 #if (CONFIG_REALTEK_APP_DASHBOARD_WITH_MIJIA_SUPPORT == 1)

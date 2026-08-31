@@ -163,6 +163,16 @@ uint8_t ai_record_scenario_get_state(void);
 void ai_record_cmd_wifi_handle(uint8_t path, uint16_t length, uint8_t *p_value, uint8_t app_idx);
 
 /**
+ * \brief  The main function to handle all the wifi command for RTL8720C
+ * \param  path    transmission path
+ * \param  length  length of command id and data
+ * \param  p_value data addr
+ * \param  app_idx received rx command device index
+*/
+void ai_record_cmd_wifi_8720c_handle(uint8_t path, uint16_t length, uint8_t *p_value,
+                                     uint8_t app_idx);
+
+/**
  * \brief  The main function to handle all the ai record app command
  * \param  path    transmission path
  * \param  length  length of command id and data

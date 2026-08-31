@@ -1,0 +1,31 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "Realtek usb_demo Application"
+
+config REALTEK_USB_AUDIO_ENABLE
+            bool "Select USB Audio Demo"
+            default y
+            help
+                Select USB Audio Demo.
+				
+config REALTEK_USB_HID_MOUSE_ENABLE
+            bool "Select USB HID Mouse Demo"
+            default n
+            help
+                Select USB HID Mouse Demo.
+
+config REALTEK_USB_HID_KEYBOARD_ENABLE
+            bool "Select USB HID Keyboard Demo"
+            default n
+            help
+                Select USB HID Keyboard Demo.
+endmenu
+
+menu "Zephyr Kernel"
+source "Kconfig.zephyr"
+endmenu
+

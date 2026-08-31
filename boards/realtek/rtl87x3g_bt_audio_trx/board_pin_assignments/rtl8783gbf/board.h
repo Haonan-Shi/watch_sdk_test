@@ -21,6 +21,7 @@ extern "C" {
 #define KEY1_GPIO_PIN           &gpiob 31     /*P8_5*/
 #define KEY2_GPIO_PIN           &gpiob 19     /*P8_6*/
 #define KEY3_GPIO_PIN           &gpiob 20     /*P8_7*/
+#define WIFI_INT_GPIO_PIN       &gpiob 18     /*P5_3*/
 
 
 #define PIN_M2S_GPIO            &gpioa 18     /*P2_3*/
@@ -39,10 +40,8 @@ extern "C" {
 #define UART0_RX_PIN            P3_0
 #define UART2_TX_PIN            P4_1
 #define UART2_RX_PIN            P4_0
-#define UART3_MP_TX_PIN         P4_2 /*Dynamic control*/
-#define UART3_MP_RX_PIN         P4_3 /*Dynamic control*/
-#define UART3_TX_PIN            P8_0
-#define UART3_RX_PIN            P8_1
+#define UART3_TX_PIN            P5_4
+#define UART3_RX_PIN            P5_5
 #define I2C1_SCL_PIN            ADC_0       /*P0_0*/
 #define I2C1_SDA_PIN            ADC_1       /*P0_1*/
 #define SDHC0_CLK_PIN           P5_0

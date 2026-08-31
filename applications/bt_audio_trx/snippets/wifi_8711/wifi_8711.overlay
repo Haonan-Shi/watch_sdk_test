@@ -1,0 +1,99 @@
+/*
+ * Copyright (c) 2026, Realtek Semiconductor Corporation
+ *
+ * SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+ */
+
+/*
+ * WiFi-8711 AT-over-SPI master snippet overlay for bt_audio_trx (pairs with
+ * wifi_8711.conf). Mirrors applications/watch/snippets/wifi_8711/wifi_8711.overlay.
+ *
+ * Enabled via the wifi_8711 snippet:
+ *   west build -b rtl87x3g_bt_audio_trx/rtl8773gtp applications/bt_audio_trx -p -S wifi_8711
+ *
+ * Adds the SPI master bus + sync GPIOs to a base board. Its DT nodes are named
+ * after this snippet (wifi_8711_device / wifi_8711_resources) so they do not
+ * collide with the spi0_device / resources nodes carried by the
+ * _transceiver_master overlays and the rtl8783gbf_record_pen overlay. The
+ * rtl8773gtp_record_pen overlay is built together with this snippet and no
+ * longer carries its own SPI nodes.
+ *
+ * The bus runs on the high-speed SPI1 controller (spi1_hs) on the dedicated
+ * P4_2..P4_5 pads with controller-driven CS, aligned with the watch snippet.
+ * The handshake and SPI1 pins are defined as macros in the board.h.
+ *
+ *   M2S handshake : PIN_M2S_GPIO    - master -> slave attention
+ *   S2M handshake : PIN_S2M_GPIO    - slave  -> master attention (IRQ in)
+ *   SPI1 SCK/MISO/MOSI/CSN : P4_2..P4_5 (spi1_hs, controller-driven SS_N)
+ *
+ * Board note: the psram0 buffer region uses rtl8773gtp addresses
+ * (psram0 = 0x22000000..0x22400000). Apply this snippet on rtl8773gtp.
+ */
+
+#include <zephyr/dt-bindings/gpio/realtek-rtl87x3g-gpio.h>
+#include <dt-bindings/pinctrl/rtl87x3g-pinctrl.h>
+
+/* SPI sync GPIOs - consumed by app_spi_master_zephyr.c via
+ * DT_NODELABEL(wifi_8711_resources). The node is named after this snippet
+ * (rather than a generic "resources") so it does not collide/merge with a
+ * "resources" node contributed by another stacked -S overlay. */
+/ {
+    wifi_8711_resources: wifi_8711_resources {
+        compatible = "spi_m2s2m-gpio";
+        m2s-gpios = < PIN_M2S_GPIO GPIO_ACTIVE_LOW >;   /* master -> slave */
+        s2m-gpios = < PIN_S2M_GPIO GPIO_ACTIVE_HIGH >;  /* slave  -> master (IRQ in) */
+    };
+};
+
+/* SPI master - high-speed SPI1 (spi1_hs) controller, hardware CS (SS_N).
+ * Node named wifi_8711_device (the wifi_8711 app driver binds via
+ * DT_NODELABEL(wifi_8711_device)); named after this snippet so it does not
+ * collide with an spi0_device node from another stacked -S overlay. */
+&spi1_hs {
+    status = "okay";
+    pinctrl-0 = <&spi_pinmux>;
+    pinctrl-names = "default";
+
+    /* SPI1 GDMA handshakes: TX = 6, RX = 7 */
+    dmas = <&dma0 0 6 0x16c21>, <&dma0 1 7 0x6c0a>; /* tx, rx */
+    dma-names = "tx", "rx";
+    rx-sample-delay = <1>;
+
+    wifi_8711_device: wifi_8711_device@0 {
+        compatible = "wifi_8711-device";
+        reg = <0>;
+        spi-max-frequency = <50000000>;
+        status = "okay";
+    };
+};
+
+&pinctrl {
+    spi_pinmux: spi_pinmux {
+        group1 {
+            psels = <RTL87X3G_PSEL(HS_P4_2_SPI1_CLK,  PIN_SPI1_CLK,  DIR_OUT, DRV_HIGH, PULL_UP)>,
+                    <RTL87X3G_PSEL(HS_P4_3_SPI1_MISO, PIN_SPI1_MISO, DIR_OUT, DRV_HIGH, PULL_UP)>,
+                    <RTL87X3G_PSEL(HS_P4_4_SPI1_MOSI, PIN_SPI1_MOSI, DIR_OUT, DRV_HIGH, PULL_UP)>,
+                    <RTL87X3G_PSEL(HS_P4_5_SPI1_CSN,  PIN_SPI1_CSN,  DIR_OUT, DRV_HIGH, PULL_UP)>;
+        };
+    };
+};
+
+&dma0 {
+    status = "okay";
+};
+
+/* Dedicated noinit region near the top of psram0 for the large SPI_XMIT_SIZE
+ * TX/RX buffers, keeping them out of DTCM. psram0 is 0x22000000..0x22400000 on
+ * rtl8773gtp; this region sits at the top, ending exactly at 0x22400000.
+ * Budget (~208K, 224K reserved): master tx_ring 64K + tx_dma 16K + rx 32K
+ * (app_spi_master_zephyr.c) + tp_test frame 16K (app_spi_atcmd.c) + bulk frame
+ * 16K + SD ping-pong stage 2*(BULK_SD_STAGE_CHUNKS=2 *16K)=64K (spi_file_upload.c).
+ * If BULK_SD_STAGE_CHUNKS / BULK_SD_PIPELINE change, the linker will flag any
+ * PSRAM_SPI section overflow - grow this region (move base down) accordingly. */
+&psram0 {
+    psram0_spi_buf: memory@223c8000 {
+        compatible = "zephyr,memory-region";
+        reg = <0x223C8000 DT_SIZE_K(224)>;
+        zephyr,memory-region = "PSRAM_SPI";
+    };
+};

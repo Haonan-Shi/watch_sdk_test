@@ -24,7 +24,7 @@ extern "C" {
 
 /* refer by device tree pinctrl*/
 #define UART2_TX_PIN            P3_1
-#define UART2_RX_PIN            P3_5
+#define UART2_RX_PIN            P3_0
 #define UART3_TX_PIN            P5_4
 #define UART3_RX_PIN            P5_5
 #define I2C1_SCL_PIN            ADC_0       /*P0_0*/

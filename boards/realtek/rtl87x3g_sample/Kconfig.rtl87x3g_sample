@@ -1,0 +1,7 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+config BOARD_RTL87X3G_SAMPLE
+	select SOC_RTL8773GTP

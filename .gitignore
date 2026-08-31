@@ -27,6 +27,10 @@ script/build_log.txt
 
 #python cache 
 __pycache__/
+.venv
+
+#mpcli log
+*.log
 
 # --- gh_release working metadata (never commit / never push) ---
 /staging/

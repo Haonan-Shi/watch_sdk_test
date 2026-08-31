@@ -230,17 +230,19 @@
 	 * 2. the sram plus heap_sram size should NOT exceed 160KByte!
 	 */
 	sram {
+
 		sram: memory@20020000 {
 			device_type = "sram region";
 			compatible = "zephyr,memory-region", "mmio-sram";
-			reg = <0x20020000 DT_SIZE_K(32)>;
+			reg = <0x20020000 DT_SIZE_K(41)>;
 			zephyr,memory-region = "SRAM";
 		};
-		heap_sram: memory@20028000 {
+		heap_sram: memory@2002A400 {
 			device_type = "heap sram region";
-			reg = <0x20028000 DT_SIZE_K(128)>;
+			reg = <0x2002A400 DT_SIZE_K(119)>;
 		};
 	};
+ 
 
 	itcm {
 		itcm: memory@c0c00 {

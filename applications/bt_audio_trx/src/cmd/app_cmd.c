@@ -86,6 +86,11 @@
 #include "app_spi_cmd.h"
 #endif
 
+#if defined(CONFIG_WIFI_8711_CMD)
+#include "app_spi_atcmd.h"
+#include "spi_tcp_tp_test.h"
+#endif
+
 #if (F_APP_A2DP_XMIT_SRC_SUPPORT || F_APP_A2DP_XMIT_SNK_SUPPORT || F_APP_A2DP_XMIT_SRC_LEA_SUPPORT)
 #include "app_a2dp_xmit_mgr.h"
 #endif
@@ -150,9 +155,6 @@
 #include "app_malleus.h"
 #endif
 
-#if F_APP_WIFI_SPI_CMD
-#include "app_wifi_transfer.h"
-#endif
 
 #if F_APP_FLASH_DUMP_SUPPORT
 #include "app_flash_dump.h"
@@ -1103,6 +1105,8 @@ void app_handle_cmd_set(uint8_t *cmd_ptr, uint16_t cmd_len, uint8_t cmd_path, ui
     case CMD_IO_PIN_PULL_HIGH:
     case CMD_ENTER_BAT_OFF_MODE:
     case CMD_MIC_MP_VERIFY_BY_HFP:
+    case CMD_USBH_AUDIO_SET_PARAM:
+    case CMD_USBH_AUDIO_CONTROL:
         {
             app_cmd_customized_cmd_handle(cmd_ptr, cmd_len, cmd_path, app_idx, ack_pkt);
         }
@@ -1347,10 +1351,18 @@ void app_handle_cmd_set(uint8_t *cmd_ptr, uint16_t cmd_len, uint8_t cmd_path, ui
     case CMD_AI_RECORD_WIFI_AUDIO_STOP:
     case CMD_AI_RECORD_WIFI_RTSP_START_RESP:
     case CMD_AI_RECORD_WIFI_RTSP_STOP_RESP:
+    case CMD_AI_RECORD_WIFI_SDIO_TX_TEST:
         {
+#if F_APP_WIFI_RTL8720C
+            app_report_event(cmd_path, EVENT_ACK, app_idx, ack_pkt, 3);
+            ai_record_cmd_wifi_8720c_handle(cmd_path, cmd_len, cmd_ptr, app_idx);
+
+#else
             ai_record_cmd_wifi_handle(cmd_path, cmd_len, cmd_ptr, app_idx);
+#endif
         }
         break;
+
     // AI APP cmd
     case CMD_AI_RECORD_APP_QUERY_INFO:
     case CMD_AI_RECORD_APP_GET_SD_INFO:
@@ -1397,24 +1409,45 @@ void app_handle_cmd_set(uint8_t *cmd_ptr, uint16_t cmd_len, uint8_t cmd_path, ui
         break;
 #endif
 
-#if F_APP_WIFI_SPI_CMD
-    case CMD_AT_CMD:
+#if (defined(CONFIG_WIFI_8711_CMD) || F_APP_WIFI_UART_CMD)
+    case CMD_AT_CMD_WLCONN:
         {
-            app_wifi_trans_handle_cmd_set(app_idx, cmd_path, cmd_ptr, cmd_len, ack_pkt);
+#if defined(CONFIG_WIFI_8711_CMD)
+            extern void app_spi_atcmd_demo(uint8_t type);
+            app_spi_atcmd_demo(cmd_ptr[2]);
+#elif F_APP_WIFI_UART_CMD
+            /* bt_audio_trx keeps the UART AT-cmd path for rtl8783gbf; watch is
+             * SPI-only and has no #elif branch here. */
+            extern void app_uart_atcmd_demo(uint8_t *ptr);
+            app_uart_atcmd_demo(&(cmd_ptr[2]));
+#endif
+            app_report_event(cmd_path, EVENT_ACK, app_idx, ack_pkt, 3);
         }
         break;
 #endif
 
-#if (F_APP_WIFI_SPI_CMD || F_APP_WIFI_UART_CMD)
-    case CMD_AT_CMD_WLCONN:
+#if defined(CONFIG_WIFI_8711_CMD)
+    /*
+     * SPI + TCP throughput test (uplink + downlink; slave as server or client).
+     * Payload layout (cmd_ptr):
+     *   [0..1] = CMD_SPI_TCP_TP_TEST
+     *   [2]    = sub-action:
+     *            0 INIT
+     *            1 WIFI_CONNECT   [3..] = ASCII "ssid,password"
+     *            2 CREATE_SERVER  [3..4] = port (uint16 LE)
+     *            3 START_UPLINK   [3]=link_id(0xFF=auto) [4..5]=chunk LE [6..7]=duration_s LE
+     *            4 STOP
+     *            5 QUERY_STATE
+     *            6 AUTO_RUN       [3..4]=port LE [5..6]=chunk LE [7..8]=duration_s LE
+     *                             [9..] = ASCII "ssid,password"
+     *            7 START_DOWNLINK [3]=link_id(0xFF=auto) [4..5]=duration_s LE
+     *            8 CREATE_CLIENT  [3..6]=remote ip octets [7..8]=port LE [9]=link_id
+     *            9 START_UPLINK_BLAST [3]=link_id(0xFF=auto) [4..7]=total bytes LE
+     */
+    case CMD_SPI_TCP_TP_TEST:
         {
-#if F_APP_WIFI_SPI_CMD
-            extern void app_spi_atcmd_demo(uint8_t type);
-            app_spi_atcmd_demo(cmd_ptr[2]);
-#elif F_APP_WIFI_UART_CMD
-            extern void app_uart_atcmd_demo(uint8_t type);
-            app_uart_atcmd_demo(cmd_ptr[2]);
-#endif
+            app_spi_tcp_tp_handle_cmd(cmd_ptr, cmd_len);
+            app_report_event(cmd_path, EVENT_ACK, app_idx, ack_pkt, 3);
         }
         break;
 #endif
@@ -1452,3 +1485,461 @@ void app_handle_cmd_set(uint8_t *cmd_ptr, uint16_t cmd_len, uint8_t cmd_path, ui
 
     APP_PRINT_TRACE1("app_handle_cmd_set--: ack_status 0x%02x", ack_pkt[2]);
 }
+
+
+
+
+// wifi test
+// 8720c wifi
+#if CONFIG_REALTEK_APP_AI_RECORD
+#if CONFIG_APP_WIFI_SDIO
+/* WiFi module SDIO transport helpers (wifi_init/wifi_enable/wifi_sdio_init/
+ * sdio_tx_test) live in src/ai_record/wifi/ and are compiled only when
+ * CONFIG_APP_WIFI_SDIO is set. The SPI-only build (gtp record_pen) has no SDIO
+ * and skips the wifi/ dir, so these must be compiled out even when
+ * the SPI command path (CONFIG_WIFI_8711_CMD) is enabled (the guard here was
+ * previously (SPI||UART), which wrongly pulled them into the gtp build and
+ * broke the link). */
+#include "wifi_app.h"
+uint8_t wifi_enable_flag = 0;
+extern int sdio_tx_test(char *p_param);
+#endif
+// static void //wifi_8720c_uart_send(uint16_t event_id, uint8_t *data, uint16_t len)
+// {
+//     if (ai_record_func_cb[AI_RECORD_CB_IDX_UART_SEND])
+//     {
+//         ai_record_func_cb[AI_RECORD_CB_IDX_UART_SEND](event_id, data, len);
+//     }
+// }
+#ifndef MIN
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+void ai_record_cmd_wifi_8720c_handle(uint8_t path, uint16_t length, uint8_t *p_value,
+                                     uint8_t app_idx)
+{
+    uint8_t ack_pkt[3];
+
+    uint16_t cmd_id = *(uint16_t *)p_value;
+    uint8_t *p;
+    bool ack_flag = false;
+
+    ack_pkt[0] = p_value[0];
+    ack_pkt[1] = p_value[1];
+    ack_pkt[2] = CMD_SET_STATUS_COMPLETE;
+
+    if (length < 2)
+    {
+        ack_pkt[2] = CMD_SET_STATUS_PARAMETER_ERROR;
+        //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+        APP_PRINT_ERROR0("ai_record_cmd_wifi_8720c_handle: error length");
+        return;
+    }
+
+    length = length - 2;
+    p = p_value + 2;
+
+    APP_PRINT_TRACE3("===>ai_record_rx_from_wifi_8720c, cmd_id 0x%x, len 0x%x, data %b",
+                     cmd_id, length, TRACE_BINARY(MIN(8, length), p));
+
+    switch (cmd_id)
+    {
+    case CMD_AI_RECORD_WIFI_QUERY_INFO:
+        {
+            // if (length == AI_RECORD_WIFI_LEN_GET_INFO)
+            // {
+            //     //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            //     /* TODO: clear local, handle query info */
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_POWER_ON:
+        {
+#if CONFIG_APP_WIFI_SDIO
+            /* p_value[2] is the 2nd payload byte (p[1]); the top-of-function
+             * guard only ensures length >= 2, so require >= 2 remaining
+             * payload bytes here before reading it to avoid an OOB read. */
+            if (length < 1)
+            {
+                ack_flag = true;
+                break;
+            }
+            if (p_value[2])
+            {
+                wifi_init();
+                wifi_enable(true);
+                wifi_sdio_init();
+                wifi_enable_flag = 1;
+            }
+            else
+            {
+                wifi_enable(false);
+            }
+#endif
+        }
+        break;
+
+    case CMD_AI_RECORD_WIFI_SDIO_TX_TEST:
+        {
+#if CONFIG_APP_WIFI_SDIO
+            // Default handler when no OK/ERROR
+            if (wifi_enable_flag == 1)
+            {
+                sdio_tx_test(NULL);
+            }
+            else
+            {
+                APP_PRINT_WARN0("wifi_enable_flag false , power on wifi first");
+            }
+#endif
+        }
+
+        break;
+    case CMD_AI_RECORD_WIFI_POWER_DOWN_RESP:
+        {
+            uint8_t dev_power_state = 0;
+            // if (length == AI_RECORD_WIFI_LEN_POWER_DOWN_STATE)
+            // {
+            //     //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            //     dev_power_state = p[0];
+            //     /* TODO: handle wifi power down (dev_power_state) */
+            //     (void)dev_power_state;
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_UPDATE_INFO_STATE:
+        {
+            // if (length == AI_RECORD_WIFI_LEN_UPDATE_PARAM)
+            // {
+            //     //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_GET_POWER_STATE:
+        {
+            // if (length == AI_RECORD_WIFI_LEN_GET_POWER_STATE)
+            // {
+            //     //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            //     /* TODO: handle notify state (p) */
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_SNAPSHOT:
+        {
+            // uint8_t snapshot_state = 0;
+            // if (length == AI_RECORD_WIFI_LEN_SNAPSHOT_STATE)
+            // {
+            //     //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            //     snapshot_state = p[0];
+            //     /* TODO: handle snapshot state per wifi_process and app_snapshot_state */
+            //     (void)snapshot_state;
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_GET_FILE_NAME:
+        {
+            // uint16_t file_name_len;
+            // uint16_t param_len;
+            // LE_ARRAY_TO_UINT16(file_name_len, p + 1);
+            // param_len = 1 + 2 + 4 + file_name_len;
+            // if (length == param_len)
+            // {
+            //     //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            //     /* TODO: handle get file name, report AI snapshot complete */
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_GET_FILE_DATA:
+        {
+            // uint16_t pkt_len;
+            // uint16_t param_len;
+            // LE_ARRAY_TO_UINT16(pkt_len, p + 1);
+            // param_len = 1 + 2 + pkt_len;
+            // if (length == param_len)
+            // {
+            //     //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            //     /* TODO: handle get file data */
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_GET_DATA_TCP:
+        {
+            /* TODO: handle rx wifi -> tx AI data (p, length) */
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_TRANS_STOP:
+        {
+            // if (length == AI_RECORD_WIFI_LEN_TRANS_STOP)
+            // {
+            //     //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            //     /* TODO: stop ai_snapshot timer, handle trans done, set lp mode */
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_RECORD_START:
+        {
+            // uint8_t record_state = 0;
+            // if (length == AI_RECORD_WIFI_LEN_RECORD_START)
+            // {
+            //     //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            //     record_state = p[0];
+            //     /* TODO: if record_state != 0 call record_stop */
+            //     (void)record_state;
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_SYNC_TIMESTAMP:
+        {
+            // //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            // if (length != AI_RECORD_WIFI_LEN_SYNC_TIMESTAMP)
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_RECORD_CONTINUE:
+        {
+            // uint8_t record_state = 0;
+            // //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            // if (length == AI_RECORD_WIFI_LEN_RECORD_CONTINUE)
+            // {
+            //     record_state = p[0];
+            //     /* TODO: if record_state != 0 call record_stop, else restart record video timer */
+            //     (void)record_state;
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_RECORD_STOP:
+        {
+            // if (length == AI_RECORD_WIFI_LEN_RECORD_STOP)
+            // {
+            //     //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            //     /* TODO: stop record video timer, call record_stop, wifi power down */
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_AUDIO_START:
+        {
+            //     uint8_t audio_state = 0;
+            //     if (length == AI_RECORD_WIFI_LEN_AUDIO_START)
+            //     {
+            //         //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            //         audio_state = p[0];
+            //         /* TODO: if audio_state != 0 call record_stop */
+            //         (void)audio_state;
+            //     }
+            //     else
+            //     {
+            //         ack_flag = true;
+            //     }
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_AUDIO_CONTINUE:
+        {
+            // uint8_t audio_state = 0;
+            // //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            // if (length == AI_RECORD_WIFI_LEN_AUDIO_CONTINUE)
+            // {
+            //     audio_state = p[0];
+            //     /* TODO: if audio_state != 0 call record_stop, else restart record audio timer */
+            //     (void)audio_state;
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_AUDIO_STOP:
+        {
+            // if (length == AI_RECORD_WIFI_LEN_AUDIO_STOP)
+            // {
+            //     //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            //     /* TODO: stop record audio timer, call record_stop, wifi power down */
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_GET_FILE_CNT:
+        {
+            // if (length == AI_RECORD_WIFI_LEN_GET_FILE_CNT)
+            // {
+            //     //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            //     /* TODO: parse result/snapshot_cnt/video_cnt from p, call get_file_cnt_cb */
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_DELETE_FILE:
+    case CMD_AI_RECORD_WIFI_DELETE_ALL:
+        break;
+    case CMD_AI_RECORD_WIFI_GET_SD_INFO:
+        {
+            // if (length == AI_RECORD_WIFI_LEN_GET_SD_INFO)
+            // {
+            //     //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            //     /* TODO: copy sd_info from p */
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_SET_WIFI_RESP:
+        {
+            // if (length == AI_RECORD_WIFI_LEN_SET_WIFI_RESQ)
+            // {
+            //     //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            //     /* TODO: stop set_wifi_mode timer, report to app, handle fail case */
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_SET_STA_MODE_RESP:
+        {
+            // if (length == AI_RECORD_WIFI_LEN_SET_STA_MODE_RESP)
+            // {
+            //     //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            //     /* TODO: stop sta_mode timer, handle fail case, call sta_resp_cb */
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_LIVE_START_RESP:
+        {
+            // uint8_t live_state = 0;
+            // if (length == AI_RECORD_WIFI_LEN_LIVE_START_RESP)
+            // {
+            //     //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            //     live_state = p[0];
+            //     /* TODO: if live_state != 0 call live_stop_cb, else stop timer & set hp mode;
+            //      *       report EVENT_AI_RECORD_APP_LIVE_START_RESP to app */
+            //     (void)live_state;
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_LIVE_STOP_RESP:
+        {
+            // if (length == AI_RECORD_WIFI_LEN_LIVE_STOP_RESP)
+            // {
+            //     //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            //     /* TODO: report EVENT_AI_RECORD_APP_LIVE_STOP_RESP to app,
+            //      *       set scenario idle, wifi power down */
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_LIVE_STREAM_RESP:
+        {
+            /* TODO: handle rx wifi -> tx stream data (p, length) */
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_RTSP_START_RESP:
+        {
+            // uint8_t rtsp_state = 0;
+            // if (length == AI_RECORD_WIFI_LEN_RTSP_START_RESP)
+            // {
+            //     //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            //     rtsp_state = p[0];
+            //     /* TODO: if rtsp_state != 0 call rtsp_stop_cb, else stop timer;
+            //      *       report EVENT_AI_RECORD_APP_RTSP_START_RESP to app */
+            //     (void)rtsp_state;
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    case CMD_AI_RECORD_WIFI_RTSP_STOP_RESP:
+        {
+            // if (length == AI_RECORD_WIFI_LEN_RTSP_STOP_RESP)
+            // {
+            //     //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+            //     /* TODO: report EVENT_AI_RECORD_APP_RTSP_STOP_RESP to app,
+            //      *       set scenario idle */
+            // }
+            // else
+            // {
+            //     ack_flag = true;
+            // }
+        }
+        break;
+    default:
+        ack_pkt[2] = CMD_SET_STATUS_UNKNOW_CMD;
+        //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+        break;
+    }
+
+    if (ack_flag == true)
+    {
+        APP_PRINT_TRACE0("ai_record_cmd_wifi_8720c_handle: invalid length");
+        ack_pkt[2] = CMD_SET_STATUS_PARAMETER_ERROR;
+        //wifi_8720c_uart_send(EVENT_ACK, ack_pkt, 3);
+    }
+}
+#endif /* CONFIG_REALTEK_APP_AI_RECORD */

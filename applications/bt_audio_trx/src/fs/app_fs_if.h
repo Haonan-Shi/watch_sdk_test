@@ -17,12 +17,26 @@
 #define FILE_NAME_LEN       (FF_MAX_LFN * sizeof(uint16_t))
 #define FS_SYNC_THRESHOLD   (4 * 1024)
 
+/* FS mount/format status codes for EVENT_FS_MOUNT_STATUS */
+#define FS_STATUS_MOUNT_OK      0
+#define FS_STATUS_MOUNT_FAIL    1
+#define FS_STATUS_FORMAT_OK     2
+#define FS_STATUS_FORMAT_FAIL   3
+
+/* Format type options for app_fs_format() */
+#define APP_FS_FMT_AUTO         0x07  /* auto-detect (FM_ANY) */
+#define APP_FS_FMT_EXFAT        0x04  /* force exFAT (FM_EXFAT) */
+#define APP_FS_FMT_FAT32        0x02  /* force FAT32 (FM_FAT32) */
+
 /**  @brief app disk power down check bit map*/
 #define APP_DISK_CHECK_IDLE          0x0000
 #define APP_DISK_CHECK_PLAYBACK      0x0001
 #define APP_DISK_CHECK_TRANS_FILE    0x0002
 #define APP_DISK_CHECK_USB           0x0004
-#define APP_DISK_CHECK_MAP           0x0004
+#define APP_DISK_CHECK_MAP           0x0008
+#define APP_DISK_CHECK_DISPLAY       0x0010
+#define APP_DISK_CHECK_WIFI_TEST     0x0020
+#define APP_DISK_CHECK_RECORD        0x0040
 
 #if DT_NODE_HAS_STATUS(DT_NODELABEL(flash_disk0), okay)
 #define FATFS_DISK_NAME                     DT_PROP(DT_NODELABEL(flash_disk0), disk_name)
@@ -231,5 +245,18 @@ int app_fs_mkfs_mount(void);
  * @return 0 on success, -1 on failure.
  */
 int32_t app_fs_init(void);
+
+#if F_APP_FS_FORMAT_SUPPORT
+/**
+ * @brief Format and re-mount the filesystem.
+ *
+ * Calls fs_deinit, fs_mkfs with the specified format option, then fs_init.
+ * On success, creates the default audio folder.
+ *
+ * @param opt Format option: APP_FS_FMT_AUTO, APP_FS_FMT_EXFAT, or APP_FS_FMT_FAT32.
+ * @return 0 on success, negative error code on failure.
+ */
+int32_t app_fs_format(uint32_t opt);
+#endif
 
 #endif //_APP_FS_IF_H_

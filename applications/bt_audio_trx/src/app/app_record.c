@@ -22,6 +22,7 @@
 #include "app_src_playback.h"
 #include "nrec.h"
 #include "app_fs_if.h"
+#include "app_ai_record_file_trans.h"
 
 #if F_APP_RECORD_EQ_SUPPORT
 #include "app_eq.h"
@@ -941,6 +942,11 @@ void app_record_handle_cmd(uint8_t app_idx, T_CMD_PATH cmd_path, uint8_t *cmd_pt
                 else
                 {
                     app_fs_if_report_file_name(record_file_handle);
+#if CONFIG_REALTEK_APP_AI_RECORD
+                    app_ai_record_file_trans_set_active_record_file(
+                        (const char *)app_fs_get_filename(record_file_handle));
+                    app_ai_record_file_trans_set_recording(true);
+#endif
                     record_start(format_info);
                 }
 #else
@@ -958,6 +964,10 @@ void app_record_handle_cmd(uint8_t app_idx, T_CMD_PATH cmd_path, uint8_t *cmd_pt
 #if F_APP_RECORD_SAVE_SUPPORT
             if (record_file_handle)
             {
+#if CONFIG_REALTEK_APP_AI_RECORD
+                app_ai_record_file_trans_set_recording(false);
+                app_ai_record_file_trans_set_active_record_file(NULL);
+#endif
                 app_fs_close_file(record_file_handle);
                 record_file_handle = NULL;
             }

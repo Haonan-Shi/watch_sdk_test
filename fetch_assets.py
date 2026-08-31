@@ -30,11 +30,12 @@ from pathlib import Path
 try:
     import yaml
 except ImportError:
-    sys.exit("需要 PyYAML:请先 `pip install pyyaml`(Zephyr west 环境通常已自带)。")
+    sys.exit("PyYAML is required: run `pip install pyyaml` first "
+             "(a Zephyr west environment usually already ships it).")
 
 HERE = Path(__file__).resolve().parent
 MANIFEST = HERE / "assets.yaml"
-MARKER = ".asset_sha256"          # 每个目录下的落地标记,记录已解压 archive 的 sha256
+MARKER = ".asset_sha256"          # per-directory marker recording the sha256 of the extracted archive
 
 
 def sha256_file(path: Path, chunk: int = 1 << 20) -> str:
@@ -46,7 +47,7 @@ def sha256_file(path: Path, chunk: int = 1 << 20) -> str:
 
 
 def download(url: str, dest: Path) -> None:
-    """流式下载,带简单进度条(不把整包读进内存)。"""
+    """Stream the download with a simple progress bar (never load the whole file into memory)."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     with urllib.request.urlopen(url) as resp:
         total = int(resp.headers.get("Content-Length", 0))
@@ -60,21 +61,21 @@ def download(url: str, dest: Path) -> None:
                 done += len(block)
                 if total:
                     pct = done * 100 // total
-                    print(f"\r    下载 {dest.name}: {pct:3d}%  "
+                    print(f"\r    downloading {dest.name}: {pct:3d}%  "
                           f"({done / (1 << 20):.1f}/{total / (1 << 20):.1f} MB)", end="")
                 else:
-                    print(f"\r    下载 {dest.name}: {done / (1 << 20):.1f} MB", end="")
+                    print(f"\r    downloading {dest.name}: {done / (1 << 20):.1f} MB", end="")
     print()
 
 
 def safe_extract(zip_path: Path, root: Path) -> None:
-    """解压前校验成员路径不越界(防 zip-slip),再全部解压到 root。"""
+    """Verify no member path escapes root (guard against zip-slip), then extract all into root."""
     root = root.resolve()
     with zipfile.ZipFile(zip_path) as zf:
         for name in zf.namelist():
             dest = (root / name).resolve()
             if root not in dest.parents and dest != root:
-                raise SystemExit(f"压缩包含越界路径,拒绝解压: {name}")
+                raise SystemExit(f"archive contains an out-of-bounds path, refusing to extract: {name}")
         zf.extractall(root)
 
 
@@ -86,38 +87,38 @@ def process(entry: dict, root: Path, force: bool, keep: bool) -> None:
 
     marker = root / adir / MARKER
     if not force and marker.is_file() and marker.read_text(encoding="utf-8").strip() == want:
-        print(f"  [{adir}] 已就位 (sha256 匹配),跳过")
+        print(f"  [{adir}] already in place (sha256 matches), skipping")
         return
 
     archive = root / name
-    print(f"  [{adir}] 下载并校验 {name} ...")
+    print(f"  [{adir}] downloading and verifying {name} ...")
     download(url, archive)
 
     got = sha256_file(archive)
     if got != want:
         archive.unlink(missing_ok=True)
-        raise SystemExit(f"  [{adir}] sha256 不匹配!\n    期望: {want}\n    实际: {got}\n"
-                         f"    已删除损坏文件,请重试。")
-    print(f"  [{adir}] sha256 校验通过")
+        raise SystemExit(f"  [{adir}] sha256 mismatch!\n    expected: {want}\n    actual:   {got}\n"
+                         f"    deleted the corrupted file, please retry.")
+    print(f"  [{adir}] sha256 verified")
 
     safe_extract(archive, root)
     (root / adir).mkdir(parents=True, exist_ok=True)
     marker.write_text(want + "\n", encoding="utf-8")
-    print(f"  [{adir}] 已解压到 {root / adir}")
+    print(f"  [{adir}] extracted into {root / adir}")
 
     if not keep:
         archive.unlink(missing_ok=True)
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="下载并还原本 release 的二进制压缩包")
-    ap.add_argument("--dir", help="解压根目录(默认:本脚本所在目录)")
-    ap.add_argument("--force", action="store_true", help="即使已就位也重新下载/解压")
-    ap.add_argument("--keep-archives", action="store_true", help="解压后保留 .zip(默认删除)")
+    ap = argparse.ArgumentParser(description="download and restore this release's binary archives")
+    ap.add_argument("--dir", help="extraction root (default: this script's directory)")
+    ap.add_argument("--force", action="store_true", help="re-download / re-extract even if already in place")
+    ap.add_argument("--keep-archives", action="store_true", help="keep the .zip files after extraction (default: delete)")
     args = ap.parse_args(argv)
 
     if not MANIFEST.is_file():
-        raise SystemExit(f"找不到清单: {MANIFEST}(应与本脚本同目录)")
+        raise SystemExit(f"manifest not found: {MANIFEST} (must sit next to this script)")
 
     with open(MANIFEST, "r", encoding="utf-8") as f:
         manifest = yaml.safe_load(f)
@@ -125,12 +126,12 @@ def main(argv=None) -> int:
     root = Path(args.dir).resolve() if args.dir else HERE
     archives = manifest.get("archives", []) or []
     version = manifest.get("version", "?")
-    print(f"版本: {version}   解压根: {root}   共 {len(archives)} 个压缩包")
+    print(f"version: {version}   extraction root: {root}   {len(archives)} archive(s)")
 
     for entry in archives:
         process(entry, root, args.force, args.keep_archives)
 
-    print("完成:所有压缩包已就位。")
+    print("done: all archives are in place.")
     return 0
 
 

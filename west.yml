@@ -1,49 +1,42 @@
 manifest:
-  self:
-    path: realtek-app
-
+  version: '1.2'
   remotes:
-    - name: origin
-      url-base: ssh://cn4soc.rtkbf.com:29418
-
+  - name: fork
+    url-base: https://github.com/Haonan-Shi
   defaults:
-    remote: origin
-
+    remote: fork
   projects:
-    - name: zephyr
-      repo-path: HoneyRepo/zephyr
-      revision: realtek-main-v3.7
-      path: zephyr
-      import:
-          path-prefix: zephyrproject
-          name-allowlist:
-            - cmsis
-            - tinycrypt
-            - mbedtls
-            - fatfs
-
-
-    - name: honeygui
-      revision: master
-      repo-path: HoneyGUI
-      path: zephyrproject/modules/honeygui
-
-    - name: lvgl
-      revision: lvgl_v9
-      repo-path: HoneyRepo/lvgl
-      path: zephyrproject/modules/lvgl
-
-    - name: display
-      revision: master
-      repo-path: HoneyRepo/driver/display
-      path: zephyrproject/modules/display
-
-    - name: hal_realtek
-      repo-path: HoneyRepo/zephyr-hal
-      revision: master
-      path: zephyrproject/modules/hal/realtek
-
-    - name: sdk
-      repo-path: HoneyComb
-      revision: release/crb-3.14.0
-      path: release-crb-3.14.0
+  - name: zephyr
+    repo-path: zephyr
+    revision: e1c13a1e268852bcf6f7395745f763c37a801894
+    path: zephyr
+    west-commands: scripts/west-commands.yml
+    import:
+      file: test.yml
+      path-prefix: zephyrproject
+      name-allowlist:
+      - cmsis
+      - tinycrypt
+      - mbedtls
+      - fatfs
+  - name: honeygui
+    repo-path: HoneyGUI
+    revision: ebe9378874810fd86c239f1def9488878257be6f
+    path: zephyrproject/modules/honeygui
+  - name: lvgl
+    repo-path: lvgl
+    revision: 491c579e0dafb49917100d45510e0d741a89d116
+    path: zephyrproject/modules/lvgl
+  - name: hal_realtek
+    repo-path: zephyr-hal
+    revision: c0895f0549181ccc40e57bf3595d4c52d83cc672
+    path: zephyrproject/modules/hal/realtek
+  - name: display
+    repo-path: display
+    revision: 82c8e046412a226d825815ea1e687912a7b387e1
+    path: zephyrproject/modules/display
+  self:
+    path: zephyrproject/realtek-app
+    userdata:
+      product: common
+      version: v1.0.0.20

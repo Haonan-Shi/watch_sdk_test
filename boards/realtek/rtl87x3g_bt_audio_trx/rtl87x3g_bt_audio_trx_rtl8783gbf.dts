@@ -156,7 +156,8 @@
 	max-bus-freq = <50000000>;
 	/*P3_4       26  /*!< GPIOA6 */ 
     pinctrl-0 = <&sdhc0_default>;
-    pinctrl-names = "default";
+    pinctrl-1 = <&sdhc0_sleep>;
+    pinctrl-names = "default", "sleep";
     status = "disabled";
 };
 
@@ -166,11 +167,12 @@
 	max-bus-freq = <50000000>;
 	/*P3_4       26  /*!< GPIOA6 */ 
     pinctrl-0 = <&sdhc1_default>;
-    pinctrl-names = "default";
+    pinctrl-1 = <&sdhc1_sleep>;
+    pinctrl-names = "default", "sleep";
     status = "disabled";
 	sdcard_disk0: sdcard_disk0 {
-		//compatible = "zephyr,sdmmc-disk";
-		compatible = "zephyr,mmc-disk";
+//	compatible = "zephyr,sdmmc-disk";
+	compatible = "zephyr,mmc-disk";
 		status = "disabled";
 	};
 };

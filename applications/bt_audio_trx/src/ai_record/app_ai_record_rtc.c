@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
  */
 
+
+
 #if CONFIG_REALTEK_APP_AI_RECORD
 #include "string.h"
 #include <stdlib.h>
@@ -12,6 +14,7 @@
 #include "ftl.h"
 #include "trace.h"
 #include "app_ai_record_rtc.h"
+#include "app_flags.h"
 
 #define IsLeapYear(yr) (!((yr) % 400) || (((yr) % 100) && !((yr) % 4)))
 #define YearLength(yr) (IsLeapYear(yr) ? 366 : 365)

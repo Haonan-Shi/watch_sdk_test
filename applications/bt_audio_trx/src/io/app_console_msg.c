@@ -854,7 +854,7 @@ void app_console_handle_msg(T_IO_MSG console_msg)
 
     case  IO_MSG_CONSOLE_BINARY_TX:
         {
-            APP_PRINT_INFO0("app_dlps_exit_callback:app task");
+            // APP_PRINT_INFO0("app_dlps_exit_callback:app task");  // noisy: fires every DLPS wake cycle
             uart_rx_disable(aci_uart_dev);
             uart_rx_enable(aci_uart_dev, test_rx_buf, sizeof(test_rx_buf), 10 * 1000U);
         }

@@ -1,0 +1,142 @@
+/*
+ * Copyright(c) 2024, Realtek Semiconductor Corporation.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <zephyr/dt-bindings/gpio/realtek-rtl87x3g-gpio.h>
+#include <zephyr/dt-bindings/pinctrl/rtl87x3g-pinctrl.h>
+#include <rtl87x3g-display-lcd.dtsi>
+
+&gpioa {
+	status = "okay";
+};
+
+&pinctrl {
+	i2c1_default: i2c1_default {
+		group1 {
+			psels = <RTL87X3G_PSEL(I2C1_CLK, ADC_0, DIR_OUT, DRV_HIGH, PULL_UP)>,
+			<RTL87X3G_PSEL(I2C1_DAT, ADC_1, DIR_OUT, DRV_HIGH, PULL_UP)>;
+		};
+	};
+};
+
+&display_lcd {
+	status = "okay";
+};
+
+/ {
+	chosen {
+		zephyr,display = &display_lcd;
+	};
+};
+
+&i2c1 {
+	pinctrl-0 = <&i2c1_default>;
+	pinctrl-names = "default";
+	status = "okay";
+	clock-frequency = <400000>;
+	touch_device: touch_chsc6417@2e {
+		compatible = "chipsemi,chsc6417";
+		reg = <0x2E>;
+		irq-gpios = <&gpioa 2 GPIO_ACTIVE_HIGH>;
+		rst-gpios = <&gpioa 3 GPIO_ACTIVE_HIGH>;
+		gesture-release-timeout-ms = <30>;
+		status = "okay";
+	};
+};
+
+
+/*delete-node only support nodes with lable */
+/delete-node/ &dtcm;
+/delete-node/ &heap_dtcm;
+/delete-node/ &sram;
+/delete-node/ &heap_sram;
+/delete-node/ &itcm;
+/delete-node/ &heap_itcm;
+/delete-node/ &dsp_share_ram;
+
+/ {
+	/* DTCM addr: 0x20000000~0x20020000, total size: 128KByte.
+	 * The front 46Kbyte was taken by RTK internal.
+	 * If users wants to increase global variables and zephyr static heap,
+	 * please follow the steps:
+	 * 1. increase dtcm size value "reg = <0x2000B800 DT_SIZE_K(NEW_SIZE)>"
+	 * 2. modify heap_dtcm addr label "heap_dtcm: memory@NEW_ADDR"
+	 * 3. modify heap_dtcm reg addr "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * 4. decrease heap_dtcm size value "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * Warning: 
+	 * 1. the dtcm address should NOT modified!
+	 * 2. the dtcm plus heap_dtcm size should NOT exceed 82KByte!
+	 */
+	dtcm {
+		dtcm: memory@2000b800 {
+			device_type = "dtcm region";
+			reg = <0x2000B800 DT_SIZE_K(81)>;
+		};
+		heap_dtcm: memory@2001fc00 {
+			device_type = "heap dtcm region";
+			reg = <0x2001FC00 DT_SIZE_K(1)>;
+		};
+	};
+	/* sram addr: 0x20020000~0x20048000, total size: 160KByte.
+	 * call zephyr_code_relocate(FILES xxx.x LOCATION SRAM) at cmakelist could relocate variables on sram. 
+	 * for more information, please refer to https://docs.zephyrproject.org/latest/kernel/code-relocation.html
+	 * If users wants to increase sram size, please follow the steps:
+	 * 1. increase sram size value "reg = <0x20020000 DT_SIZE_K(NEW_SIZE)>"
+	 * 2. modify heap_sram addr label "heap_sram: memory@NEW_ADDR"
+	 * 3. modify heap_sram reg addr "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * 4. decrease heap_sram size value "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * Warning: 
+	 * 1. the sram address should NOT modified!
+	 * 2. the sram plus heap_sram size should NOT exceed 160KByte!
+	 */
+	 sram {
+		sram: memory@20020000 {
+			device_type = "sram region";
+			compatible = "zephyr,memory-region", "mmio-sram";
+			reg = <0x20020000 DT_SIZE_K(94)>;
+			zephyr,memory-region = "SRAM";
+		};
+		heap_sram: memory@20037800 {
+			device_type = "heap sram region";
+			reg = <0x20037800 DT_SIZE_K(66)>;
+		};
+	};
+
+	itcm {
+		itcm: memory@c0c00 {
+			device_type = "itcm region";
+			compatible = "zephyr,memory-region", "arm,itcm";
+			zephyr,memory-region = "ITCM";
+			reg = <0xC0C00 DT_SIZE_K(27)>;
+		};
+		heap_itcm: memory@c7800 {
+			device_type = "heap itcm region";
+			reg = <0xC7800 DT_SIZE_K(66)>;
+		};
+	};
+
+	dsp_ram {
+		dsp_share_ram: memory@20048000 {
+			compatible = "zephyr,memory-region";
+			device_type = "dsp_share_ram region";
+			zephyr,memory-region = "DSPRAM";
+			reg = <0x20048000 DT_SIZE_K(160)>;
+		};
+	};
+
+	psram1 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		psram1_for_mcu: memory@24000000{
+			device_type = "psram 1 region";
+			reg = <0x24000000 DT_SIZE_K(3284)>;
+		};
+        psram1_for_alipay: memory@24335000 {
+            device_type = "psram 1 region";
+            reg = <0x24335000 DT_SIZE_K(200)>;
+        };
+	};
+};
+

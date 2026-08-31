@@ -8,7 +8,10 @@
 #define APP_TRANSFER_PATH_MSG_H
 
 #include <stdbool.h>
-#include "app_io_msg.h"
+/* watch port: T_IO_MSG comes from the shared app_msg.h; the bt_audio_trx local
+ * app_io_msg.h shim does not exist here. The IO message is posted to the app
+ * task with app_send_msg_to_apptask() (see app_spi_common.c). */
+#include "app_msg.h"
 #include "os_msg.h"
 
 #define APP_SPI_USE_FIXED_DMA_CHANNEL   1

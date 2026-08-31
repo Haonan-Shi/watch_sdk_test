@@ -249,6 +249,9 @@ typedef enum
 
     EVENT_AUDIO_FILE_READ_RESULT            = 0x0500,
     EVENT_FS_FILE_INFO                      = 0x0501,
+#if F_APP_FS_FORMAT_SUPPORT
+    EVENT_FS_MOUNT_STATUS                   = 0x0502,
+#endif
 
     EVENT_OTA_DEV_INFO                      = 0x0600,
     EVENT_OTA_ACTIVE_BANK_VER               = 0x0601,

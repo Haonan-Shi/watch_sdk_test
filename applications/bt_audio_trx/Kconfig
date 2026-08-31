@@ -6,53 +6,74 @@
 
 # This loads bt_audio_trx source code config
 menu "Realtek bt_audio_trx Application"
-rsource "src/Kconfig"
+	rsource "src/Kconfig"
 
 config SOC_SERIES_RTL87X3G
-            bool "Select RTL87X3G IC Type"
-            default y
-            help
-                Select RTL87X3G IC Type.
+	bool "Select RTL87X3G IC Type"
+	default y
+	help
+		Select RTL87X3G IC Type.
 
 config REALTEK_FILESYSTEM_EXFAT_SUPPORT
-            bool "Realtek Filesystem exfat support"
-            default y
-            help
-                Realtek Filesystem exfat support.
+	bool "Realtek Filesystem exfat support"
+	default y
+	help
+		Realtek Filesystem exfat support.
 
 choice
-        prompt "bank select"
-        default REALTEK_COMMON_SDK_BANK0
-config REALTEK_COMMON_SDK_BANK0
-        bool "build bank0 image"
-config REALTEK_COMMON_SDK_BANK1
-        bool "build bank1 image"
+	prompt "bank select"
+	default REALTEK_COMMON_SDK_BANK0
+	config REALTEK_COMMON_SDK_BANK0
+		bool "build bank0 image"
+	config REALTEK_COMMON_SDK_BANK1
+		bool "build bank1 image"
 endchoice
 
 choice
-        prompt "flash size select"
-        default REALTEK_COMMON_SDK_4M
-config REALTEK_COMMON_SDK_4M
-        bool "use 4M flash map"
-config REALTEK_COMMON_SDK_8M
-        bool "use 8M flash map"
-config REALTEK_COMMON_SDK_16M
-        bool "use 16M flash map"
+	prompt "flash size select"
+	default REALTEK_COMMON_SDK_4M
+	config REALTEK_COMMON_SDK_4M
+		bool "use 4M flash map"
+	config REALTEK_COMMON_SDK_8M
+		bool "use 8M flash map"
+	config REALTEK_COMMON_SDK_16M
+		bool "use 16M flash map"
 endchoice
 endmenu
 
 config REALTEK_APP_GUI
-		bool "Enable APP GUI Code"
-		default n
-		help
-			Enable APP GUI Code.
-			
+	bool "Enable APP GUI Code"
+	default n
+	help
+		Enable APP GUI Code.
+
 config REALTEK_KEY_BUTTON_8773G_ZEPHYR_CS
-		bool "Enable KEY Button Driver"
-		default n
-		help
-			Enable KEY Button Driver.
+	bool "Enable KEY Button Driver"
+	default n
+	help
+		Enable KEY Button Driver.
+
+config APP_WIFI_SDIO
+	bool "Enable WiFi SDIO driver"
+	default $(dt_alias_enabled,wifi-int)
+	help
+		Enable SDIO-based WiFi driver (wifi_sdio.c).
+		Auto-detected:
+		enabled when the DTS defines a wifi-int alias
+		(e.g. rtl8783gbf_record_pen), disabled otherwise.
+
+config REALTEK_APP_AI_RECORD
+	bool "Enable AI Record feature"
+	default n
+	help
+		Enable AI Record (pen) application code.
+
+config REALTEK_APP_AI_AUTH
+	bool "Enable AI Record authentication"
+	default n
+	help
+		Enable AI Record RTK authentication module.
 
 menu "Zephyr Kernel"
-source "Kconfig.zephyr"
+	source "Kconfig.zephyr"
 endmenu

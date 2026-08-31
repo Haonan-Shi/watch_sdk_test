@@ -20,6 +20,11 @@ extern "C" {
 #define KEY2_GPIO_PIN           &gpioa 0      /*ADC_0*/
 #define KEY3_GPIO_PIN           &gpioa 24     /*P3_1*/
 
+/* SPI 8711 handshake GPIOs (used by the wifi_8711 snippet). S2M uses the
+ * dedicated P2_4/GPIOA19 pad, which is otherwise unused on the watch board. */
+#define PIN_M2S_GPIO            &gpioa 18     /*P2_3*/
+#define PIN_S2M_GPIO            &gpioa 19     /*P2_4*/
+
 
 /* refer by device tree pinctrl*/
 #define UART2_TX_PIN            P3_1
@@ -34,6 +39,13 @@ extern "C" {
 #define SD_SDHC_DATA1_PIN          P5_3
 #define SD_SDHC_DATA2_PIN          P5_4
 #define SD_SDHC_DATA3_PIN          P5_5
+
+/* High-speed SPI1 (spi1_hs) bus pads, hardware CS (SS_N). Used by the
+ * spi_8711 snippet; the SPI1 function is fixed to the P4_2..P4_5 pads. */
+#define PIN_SPI1_CLK            P4_2
+#define PIN_SPI1_MISO           P4_3
+#define PIN_SPI1_MOSI           P4_4
+#define PIN_SPI1_CSN            P4_5
 
 /* refer by lcd driver*/
 #ifndef LCD_QSPI_CS

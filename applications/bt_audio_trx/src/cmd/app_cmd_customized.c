@@ -90,6 +90,39 @@ void app_cmd_customized_cmd_handle(uint8_t *cmd_ptr, uint16_t cmd_len, uint8_t c
         }
         break;
 
+    case CMD_USBH_AUDIO_SET_PARAM:
+        {
+            uint32_t rate       = (uint32_t)(cmd_ptr[2] | (cmd_ptr[3] << 8) | (cmd_ptr[4] << 16) |
+                                             (cmd_ptr[5] << 24));
+            uint32_t ch         = (uint32_t)(cmd_ptr[6] | (cmd_ptr[7] << 8) | (cmd_ptr[8] << 16) |
+                                             (cmd_ptr[9] << 24));
+            uint32_t bits       = (uint32_t)(cmd_ptr[10] | (cmd_ptr[11] << 8) | (cmd_ptr[12] << 16) |
+                                             (cmd_ptr[13] << 24));
+            uint32_t buf_intrvl = (uint32_t)(cmd_ptr[14] | (cmd_ptr[15] << 8) | (cmd_ptr[16] << 16) |
+                                             (cmd_ptr[17] << 24));
+
+            app_usbh_audio_set_param(rate, ch, bits, buf_intrvl);
+            app_report_event(cmd_path, EVENT_ACK, app_idx, ack_pkt, 3);
+        }
+        break;
+
+    case CMD_USBH_AUDIO_CONTROL:
+        {
+            if (cmd_ptr[2] == 0x01)
+            {
+                usbh_mgr_start();
+            }
+            else if (cmd_ptr[2] == 0x00)
+            {
+                usbh_mgr_stop();
+            }
+            else
+            {
+                APP_PRINT_WARN1("CMD_USBH_AUDIO_CONTROL: invalid control value %d", cmd_ptr[2]);
+            }
+            app_report_event(cmd_path, EVENT_ACK, app_idx, ack_pkt, 3);
+        }
+        break;
     default:
         break;
     }

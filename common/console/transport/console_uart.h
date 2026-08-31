@@ -9,6 +9,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/devicetree/dma.h>
 #include "console.h"
 #include "pm.h"
 

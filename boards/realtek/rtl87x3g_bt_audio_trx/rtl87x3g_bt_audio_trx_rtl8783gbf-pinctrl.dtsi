@@ -35,6 +35,27 @@
 				bias-pull-strong;
 		};
 	};
+	sdhc0_sleep: sdhc0_sleep {
+		group1 {
+				psels =
+				<RTL87X3G_PSEL(SW_MODE, SDHC0_CLK_PIN, DIR_IN, DRV_LOW, PULL_DOWN)>,
+				<RTL87X3G_PSEL(SW_MODE, SDHC0_CMD_PIN, DIR_IN, DRV_LOW, PULL_DOWN)>,
+				<RTL87X3G_PSEL(SW_MODE, SDHC0_DATA0_PIN, DIR_IN, DRV_LOW, PULL_DOWN)>;
+		};
+	};
+
+	sdhc1_sleep: sdhc1_sleep {
+		group1 {
+				psels =
+				<RTL87X3G_PSEL(SW_MODE, SDHC1_CLK_PIN, DIR_IN, DRV_LOW, PULL_DOWN)>,
+				<RTL87X3G_PSEL(SW_MODE, SDHC1_CMD_PIN, DIR_IN, DRV_LOW, PULL_DOWN)>,
+				<RTL87X3G_PSEL(SW_MODE, SDHC1_DATA0_PIN, DIR_IN, DRV_LOW, PULL_DOWN)>,
+				<RTL87X3G_PSEL(SW_MODE, SDHC1_DATA1_PIN, DIR_IN, DRV_LOW, PULL_DOWN)>,
+				<RTL87X3G_PSEL(SW_MODE, SDHC1_DATA2_PIN, DIR_IN, DRV_LOW, PULL_DOWN)>,
+				<RTL87X3G_PSEL(SW_MODE, SDHC1_DATA3_PIN, DIR_IN, DRV_LOW, PULL_DOWN)>;
+		};
+	};
+
 	
 	sdhc1_default:sdhc1_default {
 		group1 {
@@ -46,6 +67,7 @@
 				<RTL87X3G_PSEL(HS_P3_2_SDH1_DATA2, SDHC1_DATA2_PIN, DIR_OUT, DRV_HIGH, PULL_UP)>,
 				<RTL87X3G_PSEL(HS_P3_3_SDH1_DATA3, SDHC1_DATA3_PIN, DIR_OUT, DRV_HIGH, PULL_UP)>;
 				bias-pull-strong;
+				current-level = <1>;
 		};
 	};
 
