@@ -1,54 +1,42 @@
 manifest:
-  self:
-    path: realtek-app
-
+  version: '1.2'
   remotes:
-    - name: origin
-      url-base: ssh://cn4soc.rtkbf.com:29418
-
+  - name: fork
+    url-base: https://github.com/Haonan-Shi
   defaults:
-    remote: origin
-
+    remote: fork
   projects:
-    - name: zephyr
-      repo-path: HoneyRepo/zephyr
-      revision: realtek-main-v3.7
-      path: zephyr
-      import:
-          path-prefix: zephyrproject
-          name-allowlist:
-            - cmsis
-            - tinycrypt
-            - mbedtls
-            - fatfs
-            - openthread
-
-    - name: matter
-      revision: matter1.6
-      repo-path: MatterRepo
-      path: zephyrproject/modules/matter
-
-    - name: honeygui
-      revision: master
-      repo-path: HoneyGUI
-      path: zephyrproject/modules/honeygui
-
-    - name: lvgl
-      revision: lvgl_v9
-      repo-path: HoneyRepo/lvgl
-      path: zephyrproject/modules/lvgl
-
-    - name: display
-      revision: master
-      repo-path: HoneyRepo/driver/display
-      path: zephyrproject/modules/display
-
-    - name: hal_realtek
-      repo-path: HoneyRepo/zephyr-hal
-      revision: master
-      path: zephyrproject/modules/hal/realtek
-
-    - name: sdk
-      repo-path: HoneyComb
-      revision: release/crb-3.14.0
-      path: release-crb-3.14.0
+  - name: zephyr
+    repo-path: zephyr
+    revision: bb770ea3e21c1848431b59dfa19669b6705b4649
+    path: zephyr
+    west-commands: scripts/west-commands.yml
+    import:
+      file: test.yml
+      path-prefix: zephyrproject
+      name-allowlist:
+      - cmsis
+      - tinycrypt
+      - mbedtls
+      - fatfs
+  - name: honeygui
+    repo-path: HoneyGUI
+    revision: 39bc617aa48ea5b1d7145e29f6b28d3019544d06
+    path: zephyrproject/modules/honeygui
+  - name: lvgl
+    repo-path: lvgl
+    revision: 491c579e0dafb49917100d45510e0d741a89d116
+    path: zephyrproject/modules/lvgl
+  - name: hal_realtek
+    repo-path: zephyr-hal
+    revision: bc1f46f9b730c835faf556cf209f8aeebb249056
+    path: zephyrproject/modules/hal/realtek
+  - name: display
+    repo-path: display
+    revision: e1e0c2022638a08b7dec6f0e62ffae0b8681c4af
+    path: zephyrproject/modules/display
+  self:
+    path: zephyrproject/realtek-app
+    userdata:
+      product: watch
+      version: v1.14.3.1
