@@ -5,6 +5,7 @@
  */
 
 #include <string.h>
+#include <zephyr/dt-bindings/pinctrl/realtek-rtl87x3g-pinctrl.h>
 #include "rtl876x_pinmux.h"
 #include "rtl876x_uart.h"
 #include "fmc_api.h"
@@ -41,10 +42,6 @@
     * @{
     */
 
-#define I2C_0_CLK                 P0_0
-#define I2C_0_DAT                 P0_1
-#define BT_AUDIO_UART_TX          P3_1
-#define BT_AUDIO_UART_RX          P3_0
 #define BUCK_PWR_EN               P5_1
 
 #define BT_AUDIO_DEFAULT_PAGESCAN_WINDOW             0x12
@@ -67,6 +64,7 @@
 
 static uint8_t bd_addr_dut1[6]  = {0x13, 0x22, 0x56, 0x77, 0x67, 0x89};
 static uint8_t bd_addr_dut2[6] = {0x89, 0x67, 0x54, 0x14, 0x12, 0x19};
+
 
 void *bt_audio_evt_queue_handle;  //!< Event queue handle
 void *bt_audio_io_queue_handle;   //!< IO queue handle
@@ -194,23 +192,7 @@ static void framework_init(void)
  */
 void board_init(void)
 {
-    Pinmux_Config(BT_AUDIO_UART_TX, UART0_TX);
-    Pad_Config(BT_AUDIO_UART_TX,
-               PAD_PINMUX_MODE, PAD_IS_PWRON, PAD_PULL_NONE, PAD_OUT_DISABLE, PAD_OUT_LOW);
-
-    Pinmux_Config(BT_AUDIO_UART_RX, UART0_RX);
-    Pad_Config(BT_AUDIO_UART_RX,
-               PAD_PINMUX_MODE, PAD_IS_PWRON, PAD_PULL_NONE, PAD_OUT_DISABLE, PAD_OUT_LOW);
-
-    Pinmux_Config(I2C_0_DAT, I2C0_DAT);
-    Pinmux_Config(I2C_0_CLK, I2C0_CLK);
-
-    Pad_Config(I2C_0_DAT,
-               PAD_PINMUX_MODE, PAD_IS_PWRON, PAD_PULL_NONE, PAD_OUT_DISABLE, PAD_OUT_LOW);
-    Pad_Config(I2C_0_CLK,
-               PAD_PINMUX_MODE, PAD_IS_PWRON, PAD_PULL_NONE, PAD_OUT_DISABLE, PAD_OUT_LOW);
-    Pad_PullConfigValue(I2C_0_DAT, PAD_STRONG_PULL);
-    Pad_PullConfigValue(I2C_0_CLK, PAD_STRONG_PULL);
+    return;
 }
 
 /**
@@ -223,35 +205,37 @@ static void driver_init(void)
     T_CONSOLE_PARAM console_param;
     T_CONSOLE_OP    console_op;
     T_CONSOLE_UART_CONFIG console_uart_config;
+    memset(&console_param, 0x00, sizeof(T_CONSOLE_PARAM));
+    memset(&console_op, 0x00, sizeof(T_CONSOLE_OP));
+    memset(&console_uart_config, 0x00, sizeof(T_CONSOLE_UART_CONFIG));
 
-    console_uart_config.one_wire_uart_support = 0;
-    console_uart_config.uart_rx_pinmux = BT_AUDIO_UART_RX;
-    console_uart_config.uart_tx_pinmux = BT_AUDIO_UART_TX;
-    console_uart_config.rx_wake_up_pinmux = BT_AUDIO_UART_RX;
-    console_uart_config.enable_rx_wake_up = 0;
-    console_uart_config.data_uart_baud_rate = BAUD_RATE_115200;
+
+    /* These parameters no need to set in zephyr uart driver*/
+    // console_uart_config.uart_rx_pinmux = 0;
+    // console_uart_config.uart_tx_pinmux = 0;
+    // console_uart_config.data_uart_baud_rate = 0;
+    // console_uart_config.rx_wake_up_pinmux = 0;
+    // console_uart_config.enable_rx_wake_up = 0;
+    // console_uart_config.uart_rx_dma_enable = 0;
+    // console_uart_config.uart_tx_dma_enable = 0;
+
+    console_uart_config.one_wire_uart_support = false; // one-wire uart not support in zephyr uart
     console_uart_config.callback = NULL;
     console_uart_config.uart_dma_rx_buffer_size = CONSOLE_UART_RX_BUFFER_SIZE;
-
-#if (CONFIG_SOC_SERIES_RTL8773D == 1 || TARGET_RTL8773DFL == 1)
-    console_uart_config.uart_rx_dma_enable = true;
-#else
-    console_uart_config.uart_rx_dma_enable = false;
-#endif
-    console_uart_config.uart_tx_dma_enable = false;
-
     console_uart_config_init(&console_uart_config);
 
     console_param.tx_buf_size   = 512;
     console_param.rx_buf_size   = 512;
-    console_param.tx_wakeup_pin = BT_AUDIO_UART_TX;
-    console_param.rx_wakeup_pin = BT_AUDIO_UART_RX;
+
+    /* These parameters no need to set in zephyr uart driver*/
+    // console_param.tx_wakeup_pin = 0;
+    // console_param.rx_wakeup_pin = 0;
+    // console_op.tx_wakeup_enable = NULL;
+    // console_op.rx_wakeup_enable = NULL;
+    // console_op.wakeup = 0;
 
     console_op.init = console_uart_init;
-    console_op.tx_wakeup_enable = NULL; //console_uart_tx_wakeup_enable;
-    console_op.rx_wakeup_enable = NULL; //console_uart_rx_wakeup_enable;
     console_op.write = console_uart_write;
-    console_op.wakeup = console_uart_wakeup;
 
     console_init(&console_param, &console_op);
     console_set_mode(CONSOLE_MODE_STRING);

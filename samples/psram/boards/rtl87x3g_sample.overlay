@@ -1,0 +1,71 @@
+/*
+ * Copyright (c) 2026, Realtek Semiconductor Corporation
+ *
+ * SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+ */
+
+/ {
+    chosen {
+        zephyr,console = &uart2;
+        zephyr,shell-uart = &uart2;
+    };
+};
+
+/* Zephyr shell / console UART (pins come from the board's uart2_default) */
+&uart2 {
+    status = "okay";
+    current-speed = <921600>;
+};
+
+/ {
+	/*
+	 * Each psram chip's first 2 MB ("for_mcu") is split into a 1 MB
+	 * cacheable region (*_MCU) and a 1 MB non-cacheable region (*_NC).
+	 * Cacheability is set purely by the MPU attribute in app_mpu_config()
+	 * (this SoC maps cacheable/non-cacheable to the SAME address), so these
+	 * nodes only reserve the address ranges; the MPU regions are derived
+	 * from these node addresses/sizes. The remaining 2 MB is the heap.
+	 */
+	psram0:psram0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		psram0_for_mcu: memory@22000000{
+			compatible = "zephyr,memory-region";
+			reg = <0x22000000 DT_SIZE_K(1024)>;
+			zephyr,memory-region = "PSRAM0_MCU";
+		};
+		psram0_nc: memory@22100000{
+			compatible = "zephyr,memory-region";
+			reg = <0x22100000 DT_SIZE_K(1024)>;
+			zephyr,memory-region = "PSRAM0_NC";
+		};
+        heap_psram0: memory@22200000{
+            reg = <0x22200000 DT_SIZE_K(2048)>;
+        };
+	};
+
+	psram1:psram1 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		/* first 1 MB split: 512 KB cacheable MCU + 512 KB reserved for DSP.
+		 * The DSP range is a bare reserved node (no memory-region, no MPU
+		 * config yet) so the MCU build simply never uses it. */
+		psram1_for_mcu: memory@24000000{
+			compatible = "zephyr,memory-region";
+			reg = <0x24000000 DT_SIZE_K(512)>;
+			zephyr,memory-region = "PSRAM1_MCU";
+		};
+		psram1_for_dsp: memory@24080000{
+			reg = <0x24080000 DT_SIZE_K(512)>;
+		};
+		psram1_nc: memory@24100000{
+			compatible = "zephyr,memory-region";
+			reg = <0x24100000 DT_SIZE_K(1024)>;
+			zephyr,memory-region = "PSRAM1_NC";
+		};
+        heap_psram1: memory@24200000{
+            reg = <0x24200000 DT_SIZE_K(2048)>;
+        };
+	};
+
+};

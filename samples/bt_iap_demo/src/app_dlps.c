@@ -10,39 +10,9 @@
 #include "io_dlps.h"
 #include "section.h"
 #include "rtl876x_uart.h"
+#include "console_uart.h"
 
 static uint32_t dlps_bitmap;
-
-/**
-* @brief Console uart use cpu mode tx
-*
-* @param data Pointer to the buffer to be tx
-* @param len length of the buffer
-* @retval none
-*/
-void console_uart_direct(uint8_t *data, uint32_t len)
-{
-    uint32_t blkcount  = len / UART_TX_FIFO_SIZE;
-    uint32_t remainder = len % UART_TX_FIFO_SIZE;
-    uint32_t i = 0;
-
-    while (UART_GetFlagState(UART0, UART_FLAG_THR_TSR_EMPTY) != SET);
-    for (i = 0; i < blkcount; ++i)
-    {
-        UART_SendData(UART0, data + UART_TX_FIFO_SIZE * i, UART_TX_FIFO_SIZE);
-        /* wait tx fifo empty */
-        while (UART_GetFlagState(UART0, UART_FLAG_THR_TSR_EMPTY) != SET);
-    }
-
-    while (UART_GetFlagState(UART0, UART_FLAG_THR_TSR_EMPTY) != SET);
-    /* send left bytes */
-    if (remainder)
-    {
-        UART_SendData(UART0, data + UART_TX_FIFO_SIZE * i, remainder);
-        /* wait tx fifo empty */
-        while (UART_GetFlagState(UART0, UART_FLAG_THR_TSR_EMPTY) != SET);
-    }
-}
 
 RAM_TEXT_SECTION void app_dlps_enable(uint32_t bit)
 {
@@ -100,6 +70,8 @@ RAM_TEXT_SECTION void app_dlps_enter_callback(void)
 RAM_TEXT_SECTION void app_dlps_exit_callback(void)
 {
     APP_PRINT_INFO0("app_dlps_exit_callback");
+
+    console_uart_exit_low_power(power_mode_get());
 }
 
 void app_dlps_init(void)

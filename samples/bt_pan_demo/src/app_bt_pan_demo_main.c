@@ -37,8 +37,6 @@
     * @{
     */
 
-#define BT_PAN_DEMO_UART_TX          P3_1
-#define BT_PAN_DEMO_UART_RX          P3_0
 
 #define BT_PAN_DEMO_DEFAULT_PAGESCAN_WINDOW             0x12
 #define BT_PAN_DEMO_DEFAULT_PAGESCAN_INTERVAL           0x800 //0x800
@@ -165,13 +163,8 @@ static void framework_init(void)
  */
 void board_init(void)
 {
-    Pinmux_Config(BT_PAN_DEMO_UART_TX, UART0_TX);
-    Pad_Config(BT_PAN_DEMO_UART_TX,
-               PAD_PINMUX_MODE, PAD_IS_PWRON, PAD_PULL_UP, PAD_OUT_DISABLE, PAD_OUT_LOW);
-
-    Pinmux_Config(BT_PAN_DEMO_UART_RX, UART0_RX);
-    Pad_Config(BT_PAN_DEMO_UART_RX,
-               PAD_PINMUX_MODE, PAD_IS_PWRON, PAD_PULL_UP, PAD_OUT_DISABLE, PAD_OUT_LOW);
+    /* Console UART pins are owned by devicetree (realtek,console-uart / uart3
+     * pinctrl); the Zephyr UART driver configures them. */
 }
 
 /**
@@ -184,34 +177,22 @@ static void driver_init(void)
     T_CONSOLE_PARAM console_param;
     T_CONSOLE_OP    console_op;
     T_CONSOLE_UART_CONFIG console_uart_config;
+    memset(&console_param, 0x00, sizeof(T_CONSOLE_PARAM));
+    memset(&console_op, 0x00, sizeof(T_CONSOLE_OP));
+    memset(&console_uart_config, 0x00, sizeof(T_CONSOLE_UART_CONFIG));
 
-    console_uart_config.one_wire_uart_support = 0;
-    console_uart_config.uart_rx_pinmux = BT_PAN_DEMO_UART_RX;
-    console_uart_config.uart_tx_pinmux = BT_PAN_DEMO_UART_TX;
-    console_uart_config.rx_wake_up_pinmux = BT_PAN_DEMO_UART_RX;
-    console_uart_config.enable_rx_wake_up = 0;
-    console_uart_config.data_uart_baud_rate = BAUD_RATE_115200;
+    /* Pinmux, baud rate and wakeup pins are owned by the Zephyr UART driver
+     * (devicetree). Only the transport-level parameters are set here. */
+    console_uart_config.one_wire_uart_support = false; // one-wire uart not support in zephyr uart
     console_uart_config.callback = NULL;
     console_uart_config.uart_dma_rx_buffer_size = CONSOLE_UART_RX_BUFFER_SIZE;
-
-#if (CONFIG_SOC_SERIES_RTL8773D == 1 || TARGET_RTL8773DFL == 1)
-    console_uart_config.uart_rx_dma_enable = true;
-#else
-    console_uart_config.uart_rx_dma_enable = false;
-#endif
-    console_uart_config.uart_tx_dma_enable = false;
     console_uart_config_init(&console_uart_config);
 
     console_param.tx_buf_size   = 512;
     console_param.rx_buf_size   = 512;
-    console_param.tx_wakeup_pin = BT_PAN_DEMO_UART_TX;
-    console_param.rx_wakeup_pin = BT_PAN_DEMO_UART_RX;
 
     console_op.init = console_uart_init;
-    console_op.tx_wakeup_enable = NULL; //console_uart_tx_wakeup_enable;
-    console_op.rx_wakeup_enable = NULL; //console_uart_rx_wakeup_enable;
     console_op.write = console_uart_write;
-    console_op.wakeup = console_uart_wakeup;
 
     console_init(&console_param, &console_op);
     console_set_mode(CONSOLE_MODE_STRING);

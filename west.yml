@@ -8,7 +8,7 @@ manifest:
   projects:
   - name: zephyr
     repo-path: zephyr
-    revision: bb770ea3e21c1848431b59dfa19669b6705b4649
+    revision: dfa613d207b9234519ec93481812b3a09955bcee
     path: zephyr
     west-commands: scripts/west-commands.yml
     import:
@@ -21,7 +21,7 @@ manifest:
       - fatfs
   - name: honeygui
     repo-path: HoneyGUI
-    revision: 39bc617aa48ea5b1d7145e29f6b28d3019544d06
+    revision: 59c0bdd6a8466911de39225471f11a78cbc84309
     path: zephyrproject/modules/honeygui
   - name: lvgl
     repo-path: lvgl
@@ -29,14 +29,14 @@ manifest:
     path: zephyrproject/modules/lvgl
   - name: hal_realtek
     repo-path: zephyr-hal
-    revision: bc1f46f9b730c835faf556cf209f8aeebb249056
+    revision: 1320586305c4f70456d211fd91c60d18b5bffbb7
     path: zephyrproject/modules/hal/realtek
   - name: display
     repo-path: display
-    revision: e1e0c2022638a08b7dec6f0e62ffae0b8681c4af
+    revision: add4f71655376ac3dc264dfcbcb3d65bf917275b
     path: zephyrproject/modules/display
   self:
     path: zephyrproject/realtek-app
     userdata:
       product: watch
-      version: v1.14.3.1
+      version: v1.14.3.2

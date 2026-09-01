@@ -1,3 +1,0 @@
-click
-beautifulsoup4
-kconfiglib

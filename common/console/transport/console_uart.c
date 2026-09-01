@@ -4,746 +4,407 @@
  * SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
  */
 
+#include <zephyr/devicetree.h>
+#include "trace.h"
+
+/*
+ * Dual-path console UART transport.
+ *
+ * When a board/overlay selects a console UART through the devicetree chosen node
+ *     chosen { realtek,console-uart = &uartX; };
+ * this transport binds to that UART device. A UART with both RX and TX DMA
+ * channels uses Zephyr's async UART API; a UART without DMA uses the
+ * interrupt-driven API. The hardware instance, pins, baud rate and DMA channels
+ * all come from devicetree, so a board can route the console onto any UART by
+ * editing its overlay only.
+ *
+ */
+
+#if DT_HAS_CHOSEN(realtek_console_uart)
+#define CONSOLE_UART_ZEPHYR_NODE          DT_CHOSEN(realtek_console_uart)
+#define CONSOLE_UART_DT_RX_DMA_ENABLED    DT_DMAS_HAS_NAME(CONSOLE_UART_ZEPHYR_NODE, rx)
+#define CONSOLE_UART_DT_TX_DMA_ENABLED    DT_DMAS_HAS_NAME(CONSOLE_UART_ZEPHYR_NODE, tx)
+#else
+#error "The dts node (realtek,console-uart) should be defined!"
+#endif
+
 #include <string.h>
 #include <stdlib.h>
-#include "trace.h"
-#include "os_msg.h"
-#include "os_sync.h"
-#include "rtl876x_uart.h"
-#include "rtl876x_gdma.h"
-#include "rtl876x_nvic.h"
-#include "rtl876x_rcc.h"
-#if F_APP_ONE_WIRE_UART_SUPPORT
-#include "app_io_msg.h"
-#endif
-#include "app_dlps.h"
+#include <errno.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/irq.h>
+#include <zephyr/kernel.h>
 #include "console.h"
-#include "vector_table.h"
-#include "section.h"
-#include "rtl876x.h"
-#include "pm.h"
-#include "dma_channel.h"
 #include "console_uart.h"
 
-#if F_APP_ONE_WIRE_UART_SUPPORT && F_APP_ONE_WIRE_UART_TX_MODE_PUSH_PULL
-#include "app_one_wire_uart.h"
+#if CONSOLE_UART_DT_RX_DMA_ENABLED != CONSOLE_UART_DT_TX_DMA_ENABLED
+#error "realtek,console-uart must configure both RX and TX DMA or neither"
 #endif
 
-#define RX_WAKE_UP_SUPPORT      0
-
-#if RX_WAKE_UP_SUPPORT
-#include "hal_gpio.h"
+#if CONSOLE_UART_DT_RX_DMA_ENABLED
+#if !defined(CONFIG_UART_ASYNC_API)
+#error "DMA console UART requires CONFIG_UART_ASYNC_API=y"
+#endif
+#define CONSOLE_UART_USE_ASYNC_DMA 1
+#else
+#if !defined(CONFIG_UART_INTERRUPT_DRIVEN)
+#error "Non-DMA console UART requires CONFIG_UART_INTERRUPT_DRIVEN=y"
+#endif
+#define CONSOLE_UART_USE_IRQ 1
 #endif
 
-/********************************************
-DMA Channel/vector_table/GPIO_InitTypeDef
-********************************************/
-// Data Uart Handler
-#define Data_Uart_Handler  UART0_Handler
+/*
+ * timeout 0: the rtl87x3g async driver flushes RX on every UART idle, giving
+ * per-keystroke delivery suitable for an interactive console.
+ */
+#define CONSOLE_UART_RX_TIMEOUT  0
 
-#undef UART_TX_DMA_CHANNEL_NUM
-#undef UART_TX_DMA_CHANNEL
-#undef UART_TX_DMA_IRQ
-
-#undef UART_RX_DMA_CHANNEL_NUM
-#undef UART_RX_DMA_CHANNEL
-#undef UART_RX_DMA_IRQ
-
-#define UART_TX_DMA_CHANNEL_NUM     console_tx_dma_ch_num
-#define UART_TX_DMA_CHANNEL         DMA_CH_BASE(console_tx_dma_ch_num)
-#define UART_TX_DMA_IRQ             DMA_CH_IRQ(console_tx_dma_ch_num)
-
-#define UART_RX_DMA_CHANNEL_NUM     console_rx_dma_ch_num
-#define UART_RX_DMA_CHANNEL         DMA_CH_BASE(console_rx_dma_ch_num)
-#define UART_RX_DMA_IRQ             DMA_CH_IRQ(console_rx_dma_ch_num)
-
-void console_uart_handle_tx_done(void);
-bool uart_send_by_cpu_action(uint8_t *buf, uint32_t len);
-
-uint8_t *uart_rx_buf_addr = NULL;
-uint16_t uart_tx_count = 0;
-
-P_CONSOLE_CALLBACK p_console_callback = NULL;
-
-uint8_t console_tx_dma_ch_num = 0xa5;
-uint8_t console_rx_dma_ch_num = 0xa5;
-
-static uint8_t *uart_tx_curr_addr;
-static uint32_t uart_tx_len;
-static uint8_t tx_empty_need_handle = 0;
+static const struct device *const console_uart_dev = DEVICE_DT_GET(CONSOLE_UART_ZEPHYR_NODE);
 
 T_CONSOLE_UART_CONFIG g_console_uart;
+P_CONSOLE_CALLBACK p_console_callback = NULL;
 
-/**
+/* One allocation is split into two buffers for seamless async DMA RX. */
+static uint8_t *console_uart_rx_mem;
+static uint8_t *console_uart_rx_buf[2];
+static uint16_t console_uart_rx_buf_size;
 
- * @brief  Uart interface process received data accordint to interrupt.
- *         If enable GDMA, GDMA will carry data from UART peripheral. GDMA only need idle interrupt.
- *         GDMA can trigger data uart interrupt every receive 128 bytes data, and
- *         the number has been setting in uart driver init.
- *         When uart rx timeout interrupt cause, app will read UART peripheral data until
- *         UART FIFO is empty.
- * @param  void
- * @return void
- */
-RAM_TEXT_SECTION void Data_Uart_Handler(void)
-{
-    uint32_t int_status = 0;
-    uint16_t rx_count = 0;
-    uint16_t fifo_count;
-
-    UART_MaskINTConfig(UART0, UART_INT_MASK_TX_FIFO_EMPTY, ENABLE);
-
-    int_status = UART_GetIID(UART0);
-
-    if (UART_GetFlagState(UART0, UART_FLAG_RX_IDLE) == SET)
-    {
-        //clear Flag
-        UART_ClearINT(UART0, UART_FLAG_RX_IDLE);
-
-        if (g_console_uart.uart_rx_dma_enable)
-        {
-            //suspend will cause FIFO length + 1
-            //read DMA FIFO length before suspend
-            GDMA_SuspendCmd(UART_RX_DMA_CHANNEL, ENABLE);
-            /*should waiting or fifo_count will not right when rx one byte or three byte*/
-            while (GDMA_GetFIFOStatus(UART_RX_DMA_CHANNEL) != SET);
-            //read DMA FIFO length before suspend
-            fifo_count = GDMA_GetTransferLen(UART_RX_DMA_CHANNEL);
-            GDMA_Cmd(UART_RX_DMA_CHANNEL_NUM, DISABLE);
-            rx_count = fifo_count;
-            if (p_console_callback)
-            {
-                p_console_callback(CONSOLE_EVT_DATA_IND, uart_rx_buf_addr, rx_count);
-            }
-
-            GDMA_SetDestinationAddress(UART_RX_DMA_CHANNEL, (uint32_t)uart_rx_buf_addr);
-            GDMA_SuspendCmd(UART_RX_DMA_CHANNEL, DISABLE);
-            GDMA_Cmd(UART_RX_DMA_CHANNEL_NUM, ENABLE);
-        }
-    }
-
-#if F_APP_ONE_WIRE_UART_SUPPORT
-    if (g_console_uart.one_wire_uart_support && (UART_GetFlagState(UART0, UART_FLAG_TX_DONE) == SET))
-    {
-        UART_INTConfig(UART0, UART_INT_TX_DONE, DISABLE);
-#if F_APP_ONE_WIRE_UART_TX_MODE_PUSH_PULL
-        /* Switch to UART Rx after send data */
-        app_one_wire_uart_switch_pinmux(ONE_WIRE_UART_RX);
+#if defined(CONSOLE_UART_USE_IRQ)
+static uint8_t *console_uart_tx_buf;
+static uint32_t console_uart_tx_len;
+static uint32_t console_uart_tx_offset;
+static bool console_uart_tx_active;
 #else
-        // clear Rx fifo
-        UART_ClearRxFifo(UART0);
-        // enable uart rx interrupter
-        UART_INTConfig(UART0, UART_INT_RD_AVA | UART_INT_IDLE | UART_INT_LINE_STS, ENABLE);
+static uint8_t console_uart_rx_next;
 #endif
-    }
-#endif
+static bool console_uart_initialized;
 
-    if ((int_status == UART_INT_ID_RX_TMEOUT) || (int_status == UART_INT_ID_RX_LEVEL_REACH))
-    {
-        rx_count = UART_GetRxFIFOLen(UART0);
-        UART_ReceiveData(UART0, uart_rx_buf_addr, rx_count);
-
-        if (p_console_callback)
-        {
-            p_console_callback(CONSOLE_EVT_DATA_IND, uart_rx_buf_addr, rx_count);
-        }
-    }
-    else if (int_status == UART_INT_ID_TX_EMPTY)
-    {
-        UART_INTConfig(UART0, UART_INT_FIFO_EMPTY, (FunctionalState)DISABLE);
-        UART_GetIID(UART0);
-        if (uart_tx_len)
-        {
-            uart_send_by_cpu_action(uart_tx_curr_addr, uart_tx_len);
-        }
-        else
-        {
-            if (tx_empty_need_handle)
-            {
-                tx_empty_need_handle = 0;
-                console_uart_handle_tx_done();
-            }
-        }
-    }
-#if F_APP_ONE_WIRE_UART_SUPPORT
-    else if (g_console_uart.one_wire_uart_support && (int_status == UART_INT_ID_LINE_STATUS))
-    {
-        uint8_t line_status = UART_GetLineStatus(UART0);
-
-        if (UART_CheckLineStatus(line_status, UART_FLAG_BREAK_ERR))
-        {
-            T_IO_MSG uart_msg;
-
-            UART_INTConfig(UART0, UART_INT_RD_AVA | UART_INT_IDLE | UART_INT_LINE_STS, DISABLE);
-
-            uart_msg.type = IO_MSG_TYPE_UART_LINE_STATUS;
-            uart_msg.subtype = 0;
-            uart_msg.u.param =  0;
-            app_io_msg_send(&uart_msg);
-        }
-    }
-#endif
-    UART_MaskINTConfig(UART0, UART_INT_MASK_TX_FIFO_EMPTY, DISABLE);
-}
-
-/**
- * @brief  GDMA0 channel 2 used for receive UART peripheral data.
- *         First clear rx GDMA interrupt mask and disable rx GDMA channel interrupt.
- *         Save data to UART rx buffer and set GDMA destination address.
- *         Then enable rx GDMA channel interrupt.
- *         Send IO_MSG_UART_RX event to app task.
- * @param  void
- * @return void
- */
-ISR_TEXT_SECTION void console_rx_dma_handler(void)
+static void console_uart_notify(T_CONSOLE_EVT evt, uint8_t *buf, uint32_t len)
 {
-    uint16_t rx_count;
-
-    GDMA_INTConfig(UART_RX_DMA_CHANNEL_NUM, GDMA_INT_Transfer, DISABLE);
-    GDMA_ClearINTPendingBit(UART_RX_DMA_CHANNEL_NUM, GDMA_INT_Transfer);
-    GDMA_Cmd(UART_RX_DMA_CHANNEL_NUM, DISABLE);
-
-    rx_count = GDMA_GetTransferLen(UART_RX_DMA_CHANNEL);
-
-    //APP_PRINT_ERROR1("console_rx_dma_handler: rx_count %d", rx_count);
-
     if (p_console_callback)
     {
-        p_console_callback(CONSOLE_EVT_DATA_IND, uart_rx_buf_addr, rx_count);
+        p_console_callback(evt, buf, len);
     }
-
-    GDMA_SetDestinationAddress(UART_RX_DMA_CHANNEL, (uint32_t)uart_rx_buf_addr);
-    GDMA_INTConfig(UART_RX_DMA_CHANNEL_NUM, GDMA_INT_Transfer, ENABLE);
-    GDMA_Cmd(UART_RX_DMA_CHANNEL_NUM, ENABLE);
 }
 
-/**
- * @brief  GDMA0 channel 1 used for send UART peripheral data.
- *         When GDMA has been finished send all data, this interrupt will be cause.
- *         Clear tx GDMA channel all interrupt mask.
- *         Send IO_MSG_UART_TX event to app task, notify app to next tx action.
- * @param  void
- * @return void
- */
-ISR_TEXT_SECTION void console_tx_dma_handler(void)
+static bool console_uart_alloc_rx_buffers(void)
 {
-    GDMA_ClearAllTypeINT(UART_TX_DMA_CHANNEL_NUM);
-
-    console_uart_handle_tx_done();
-}
-
-/**
- * @brief  UART tx wake up GPIO pinmux setting initial.
- *         Include APB peripheral clock config, UART tx GPIO parameter config.
- * @param  pin
- * @return bool
- */
-bool console_uart_tx_wakeup_enable(uint8_t pin)
-{
-#if RX_WAKE_UP_SUPPORT
-    /*gpio init*/
-    hal_gpio_init_pin(pin, GPIO_TYPE_CORE, GPIO_DIR_OUTPUT, GPIO_PULL_DOWN);
-#endif
-    return true;
-}
-
-/**
- * @brief  UART rx wake up GPIO pinmux setting initial.
- *         Include APB peripheral clock config, UART rx GPIO parameter config
- *         and UART rx GPIO interrupt mark config. Enable UART rx GPIO interrupt.
- *         When receive UART data, the system will be wake up from dlps mode.
- * @param  pin
- * @return bool
- */
-bool console_uart_rx_wakeup_enable(uint8_t pin)
-{
-#if RX_WAKE_UP_SUPPORT
-    /*gpio init*/
-    hal_gpio_init_pin(pin, GPIO_TYPE_CORE, GPIO_DIR_INPUT, GPIO_PULL_UP);
-    hal_gpio_set_up_irq(pin, GPIO_IRQ_EDGE, GPIO_IRQ_ACTIVE_LOW, true);
-    hal_gpio_irq_enable(pin);
-#endif
-    return true;
-}
-
-/**
- * @brief  UART rx wake up interrupt will be handle in this function.
- *         First read current UART rx GPIO pinmux input data bit and disable UART rx GPIO interrupt.
- *         Enable or disable app enter dlps mode according to UART rx pinmux status.
- *         Then enable UART rx GPIO interrupt.
- * @param  void
- * @return void
- */
-bool console_uart_wakeup(void)
-{
-#if RX_WAKE_UP_SUPPORT
-    uint8_t gpio_status;
-    uint8_t pin_num = g_console_uart.rx_wake_up_pinmux;
-
-    /*gpio init*/
-    hal_gpio_init_pin(pin_num, GPIO_TYPE_CORE, GPIO_DIR_INPUT, GPIO_PULL_UP);
-    gpio_status = hal_gpio_get_input_level(g_console_uart.rx_wake_up_pinmux);
-
-    /* Disable GPIO interrupt */
-    hal_gpio_irq_disable(g_console_uart.rx_wake_up_pinmux);
-
-    hal_gpio_set_up_irq(pin_num, GPIO_IRQ_EDGE, GPIO_IRQ_ACTIVE_LOW, true);
-
-
-    /* Change GPIO Interrupt Polarity */
-    if (gpio_status) //GPIO released
-    {
-        hal_gpio_irq_change_polarity(g_console_uart.rx_wake_up_pinmux, GPIO_IRQ_ACTIVE_LOW);//Polarity Low
-        app_dlps_enable(APP_DLPS_ENTER_CHECK_UART_RX);
-    }
-    else //GPIO detected
-    {
-        hal_gpio_irq_change_polarity(g_console_uart.rx_wake_up_pinmux,
-                                     GPIO_IRQ_ACTIVE_HIGH); //Polarity High
-        app_dlps_disable(APP_DLPS_ENTER_CHECK_UART_RX);
-    }
-
-    /* Enable GPIO interrupt */
-
-    hal_gpio_irq_enable(g_console_uart.rx_wake_up_pinmux);
-    //hal_gpio_register_isr_callback(pin_num, NULL, 0);
-#endif
-    return true;
-}
-
-/**
-    * @brief  UART tx channel start send data.
-    *         Set GDMA source address and buffer size according to incoming parameters.
-    *         Command GDMA tx channel to send data with os lock.
-    * @param  void
-    * @return void
-    */
-bool console_uart_dma_write(uint8_t *buf, uint32_t len)
-{
-    uint32_t s;
-
-#if F_APP_ONE_WIRE_UART_SUPPORT
-    if (g_console_uart.one_wire_uart_support)
-    {
-        UART_INTConfig(UART0, UART_INT_TX_DONE, ENABLE);
-    }
-#endif
-
-    GDMA_SetSourceAddress(UART_TX_DMA_CHANNEL, (uint32_t)buf);
-    GDMA_SetBufferSize(UART_TX_DMA_CHANNEL, len);
-    s = os_lock();
-    GDMA_Cmd(UART_TX_DMA_CHANNEL_NUM, ENABLE);
-    os_unlock(s);
-
-    return true;
-}
-
-/**
-  * @brief  UART send data by cpu action.
-  * @param  void
-  * @return void
-  */
-RAM_TEXT_SECTION bool uart_send_by_cpu_action(uint8_t *buf, uint32_t len)
-{
-    uint32_t tx_len = len > UART_TX_FIFO_SIZE ? UART_TX_FIFO_SIZE : len;
-
-#if F_APP_ONE_WIRE_UART_SUPPORT
-    if (g_console_uart.one_wire_uart_support && (tx_len == len))
-    {
-        UART_INTConfig(UART0, UART_INT_TX_DONE, ENABLE);
-    }
-#endif
-
-    UART_SendData(UART0, buf, tx_len);
-
-    uart_tx_curr_addr = buf + tx_len;
-    uart_tx_len = len - tx_len;
-
-    tx_empty_need_handle = 1;
-    UART_INTConfig(UART0, UART_INT_FIFO_EMPTY, ENABLE);
-
-    return true;
-}
-
-
-/**
-  * @brief  UART send data by cpu action.
-  * @param  void
-  * @return void
-  */
-bool console_uart_write(uint8_t *buf, uint32_t len)
-{
-    //APP_PRINT_ERROR2("console_uart_write: %p, %d", buf, len);
-
-    uart_tx_count = len;
-    app_dlps_disable(APP_DLPS_ENTER_CHECK_UART_TX);
-
-#if F_APP_ONE_WIRE_UART_SUPPORT
-    if (g_console_uart.one_wire_uart_support)
-    {
-#if F_APP_ONE_WIRE_UART_TX_MODE_PUSH_PULL
-        /* Switch to UART Tx before send data */
-        app_one_wire_uart_switch_pinmux(ONE_WIRE_UART_TX);
+    uint8_t buffer_count =
+#if defined(CONSOLE_UART_USE_ASYNC_DMA)
+        2U;
 #else
-        // disable uart RX interrupter
-        UART_INTConfig(UART0, UART_INT_RD_AVA | UART_INT_IDLE | UART_INT_LINE_STS, DISABLE);
-#endif
-    }
+        1U;
 #endif
 
-    if (g_console_uart.uart_tx_dma_enable)
+    if (console_uart_rx_mem)
     {
-        return console_uart_dma_write(buf, len);
-    }
-    else
-    {
-        return uart_send_by_cpu_action(buf, len);
-    }
-}
-
-/**
- * @brief  console uart handle tx data done, static function.
- * @param  void
- * @return void
- */
-RAM_TEXT_SECTION void console_uart_handle_tx_done(void)
-{
-    uint16_t tx_count;
-
-    /* GDMA_GetTransferLen(UART_TX_DMA_CHANNEL) is cleared when Channel disabled,
-     * we just use the global variable to save it.
-     * Let hardware to fix the DMA issue.
-     */
-    tx_count = uart_tx_count;
-    app_dlps_enable(APP_DLPS_ENTER_CHECK_UART_TX);
-
-    if (p_console_callback)
-    {
-        p_console_callback(CONSOLE_EVT_DATA_XMIT, NULL, tx_count);
-    }
-}
-
-/**
- * @brief  UART driver initial.
- *         Include APB peripheral clock config, UART parameter config
- * @param  void
- * @return void
- */
-void console_uart_driver_init(void)
-{
-    UART_InitTypeDef uart_init;
-    NVIC_InitTypeDef uart_nvic;
-
-#if F_APP_ONE_WIRE_UART_SUPPORT
-    if (g_console_uart.one_wire_uart_support)
-    {
-#if F_APP_ONE_WIRE_UART_TX_MODE_PUSH_PULL
-        UART_OneWireConfig(UART0, false);
-#else
-        UART_OneWireConfig(UART0, true);
-#endif
-    }
-#endif
-    /* Turn on UART clock */
-    RCC_PeriphClockCmd(APBPeriph_UART0, APBPeriph_UART0_CLOCK, ENABLE);
-    RamVectorTableUpdate(UART0_VECTORn, Data_Uart_Handler);
-
-    UART_StructInit(&uart_init);
-    switch (g_console_uart.data_uart_baud_rate)
-    {
-    case BAUD_RATE_9600:
-        uart_init.div = 271;
-        uart_init.ovsr = 10;
-        uart_init.ovsr_adj = 0x24A;
-        break;
-
-    case BAUD_RATE_19200:
-        uart_init.div = 165;
-        uart_init.ovsr = 7;
-        uart_init.ovsr_adj = 0x5AD;
-        break;
-
-    case BAUD_RATE_115200:
-        uart_init.div = 20;
-        uart_init.ovsr = 12;
-        uart_init.ovsr_adj = 0x252;
-        break;
-
-    case BAUD_RATE_230400:
-        uart_init.div = 10;
-        uart_init.ovsr = 12;
-        uart_init.ovsr_adj = 0x252;
-        break;
-
-    case BAUD_RATE_460800:
-        uart_init.div = 5;
-        uart_init.ovsr = 12;
-        uart_init.ovsr_adj = 0x252;
-        break;
-
-    case BAUD_RATE_921600:
-        uart_init.div = 4;
-        uart_init.ovsr = 5;
-        uart_init.ovsr_adj = 0x3F7;
-        break;
-
-    case BAUD_RATE_1000000:
-        uart_init.div = 4;
-        uart_init.ovsr = 5;
-        uart_init.ovsr_adj = 0x0;
-        break;
-
-    case BAUD_RATE_2000000:
-        uart_init.div = 2;
-        uart_init.ovsr = 5;
-        uart_init.ovsr_adj = 0;
-        break;
-
-    case BAUD_RATE_3000000:
-        uart_init.div = 1;
-        uart_init.ovsr = 8;
-        uart_init.ovsr_adj = 0x492;
-        break;
-
-    case BAUD_RATE_4000000:
-        uart_init.div = 1;
-        uart_init.ovsr = 5;
-        uart_init.ovsr_adj = 0;
-        break;
-
-    default:
-        break;
+        return true;
     }
 
-    uart_init.dmaEn = UART_DMA_ENABLE;
-    uart_init.TxDmaEn = g_console_uart.uart_tx_dma_enable ? ENABLE : DISABLE;
-    uart_init.TxWaterlevel = 15;
-    uart_init.RxDmaEn = g_console_uart.uart_rx_dma_enable ? ENABLE : DISABLE;
-    uart_init.RxWaterlevel = 1;
-
-    //uart_init.rxTriggerLevel = UART_RX_FIFO_TRIGGER_LEVEL_8BYTE;
-    UART_Init(UART0, &uart_init);
-    if (!g_console_uart.uart_rx_dma_enable)
+    console_uart_rx_buf_size = g_console_uart.uart_dma_rx_buffer_size;
+    if (console_uart_rx_buf_size == 0U)
     {
-        UART_INTConfig(UART0, UART_INT_RD_AVA | UART_INT_IDLE, ENABLE);
-    }
-    else
-    {
-        UART_INTConfig(UART0, UART_INT_IDLE, ENABLE);
-    }
-
-    /* Enable UART IRQ */
-    uart_nvic.NVIC_IRQChannel = UART0_IRQn;
-    uart_nvic.NVIC_IRQChannelPriority = 5;
-    uart_nvic.NVIC_IRQChannelCmd = (FunctionalState)ENABLE;
-    NVIC_Init(&uart_nvic);
-}
-
-
-/**
- * @brief  UART tx dma driver initial.
- *         Include APB peripheral clock config, GDMA parameter config
- * @param  void
- * @return void
- */
-void console_uart_tx_dma_init(void)
-{
-    GDMA_InitTypeDef tx_gdma;
-    NVIC_InitTypeDef tx_nvic;
-
-    /*-------GDMA clock enable-------*/
-    RCC_PeriphClockCmd(APBPeriph_GDMA, APBPeriph_GDMA_CLOCK, ENABLE);
-
-    /*-------UART Tx GDMA configuration -------*/
-    GDMA_StructInit(&tx_gdma);
-    tx_gdma.GDMA_ChannelNum = UART_TX_DMA_CHANNEL_NUM;
-    tx_gdma.GDMA_DIR = GDMA_DIR_MemoryToPeripheral;
-    tx_gdma.GDMA_BufferSize = 0;
-    tx_gdma.GDMA_SourceInc = DMA_SourceInc_Inc;
-    tx_gdma.GDMA_DestinationInc  = DMA_DestinationInc_Fix;
-    tx_gdma.GDMA_DestinationAddr = (uint32_t)(&(UART0->RB_THR));
-    tx_gdma.GDMA_DestHandshake   = GDMA_Handshake_UART0_TX;
-    tx_gdma.GDMA_ChannelPriority = 5; //channel prority between 0 to 6
-    GDMA_Init(UART_TX_DMA_CHANNEL, &tx_gdma);
-
-    /*-------GDMA Tx IRQ init-------*/
-    tx_nvic.NVIC_IRQChannel = UART_TX_DMA_IRQ;
-    tx_nvic.NVIC_IRQChannelPriority = 5;
-    tx_nvic.NVIC_IRQChannelCmd = (FunctionalState)ENABLE;
-    NVIC_Init(&tx_nvic);
-    GDMA_INTConfig(UART_TX_DMA_CHANNEL_NUM, GDMA_INT_Transfer, ENABLE);
-}
-
-
-/**
- * @brief  UART rx dma driver initial.
- *         Include APB peripheral clock config, GDMA parameter config
- * @param  void
- * @return void
- */
-void console_uart_rx_dma_init(void)
-{
-    GDMA_InitTypeDef rx_gdma;
-    NVIC_InitTypeDef rx_nvic;
-
-    /*-------GDMA clock enable-------*/
-    RCC_PeriphClockCmd(APBPeriph_GDMA, APBPeriph_GDMA_CLOCK, ENABLE);
-
-    /*-------UART Rx GDMA configuration -------*/
-    GDMA_StructInit(&rx_gdma);
-    rx_gdma.GDMA_ChannelNum      = UART_RX_DMA_CHANNEL_NUM;
-    rx_gdma.GDMA_DIR             = GDMA_DIR_PeripheralToMemory;
-    rx_gdma.GDMA_BufferSize      = g_console_uart.uart_dma_rx_buffer_size;
-    rx_gdma.GDMA_SourceInc       = DMA_SourceInc_Fix;
-    rx_gdma.GDMA_DestinationInc  = DMA_DestinationInc_Inc;
-    rx_gdma.GDMA_SourceDataSize  = GDMA_DataSize_Byte;
-    rx_gdma.GDMA_DestinationDataSize = GDMA_DataSize_Byte;
-    rx_gdma.GDMA_SourceMsize     = GDMA_Msize_1;
-    rx_gdma.GDMA_DestinationMsize = GDMA_Msize_1;
-    rx_gdma.GDMA_SourceAddr   = (uint32_t)(&(UART0->RB_THR));
-    rx_gdma.GDMA_DestinationAddr = (uint32_t)uart_rx_buf_addr;
-    rx_gdma.GDMA_SourceHandshake = GDMA_Handshake_UART0_RX;
-    rx_gdma.GDMA_ChannelPriority = 5; //channel prority between 0 to 6
-    GDMA_Init(UART_RX_DMA_CHANNEL, &rx_gdma);
-
-    /*-------GDMA Rx IRQ init-------*/
-    rx_nvic.NVIC_IRQChannel = UART_RX_DMA_IRQ;
-    rx_nvic.NVIC_IRQChannelPriority = 5;
-    rx_nvic.NVIC_IRQChannelCmd = (FunctionalState)ENABLE;
-    NVIC_Init(&rx_nvic);
-    GDMA_INTConfig(UART_RX_DMA_CHANNEL_NUM, GDMA_INT_Transfer, ENABLE);
-
-    //GDMA_Cmd(UART_TX_DMA_CHANNEL_NUM, ENABLE);
-    GDMA_Cmd(UART_RX_DMA_CHANNEL_NUM, ENABLE);
-}
-
-/**
- * @brief console uart exit dlps set
- *
- * @param None
- * @retval None
- */
-void console_uart_enter_low_power(POWERMode mode)
-{
-    if (g_console_uart.enable_rx_wake_up)
-    {
-        System_WakeUpPinEnable(g_console_uart.rx_wake_up_pinmux, PAD_WAKEUP_POL_LOW);
-        System_WakeUpInterruptEnable(g_console_uart.rx_wake_up_pinmux);
-    }
-    else
-    {
-        uint8_t uart_rx_pinmux = g_console_uart.uart_rx_pinmux;
-        System_WakeUpPinEnable(uart_rx_pinmux, PAD_WAKEUP_POL_LOW);
-        System_WakeUpInterruptEnable(uart_rx_pinmux);
-    }
-}
-
-/**
- * @brief console uart enter dlps set
- *
- * @param mode current low power mode to enter
- *
- */
-void console_uart_exit_low_power(POWERMode mode)
-{
-    if (!g_console_uart.enable_rx_wake_up)
-    {
-        uint8_t uart_rx_pinmux = g_console_uart.uart_rx_pinmux;
-
-        if (System_WakeUpInterruptValue(uart_rx_pinmux) == SET)
-        {
-            if (g_console_uart.callback)
-            {
-                g_console_uart.callback(CONSOLE_UART_EVENT_WAKE_UP);
-            }
-        }
-    }
-
-    /*need init gdma angin for exit dlps can not restort gdma setting*/
-    if (g_console_uart.uart_tx_dma_enable)
-    {
-        console_uart_tx_dma_init();
-    }
-
-    if (g_console_uart.uart_rx_dma_enable)
-    {
-        console_uart_rx_dma_init();
-    }
-}
-
-
-/**
- * @brief  UART driver initial.
- *         Include APB peripheral clock config, UART GPIO parameter config and
- *         GDMA channel parameter config. Enable UART GPIO and GDMA channel interrupt.
- *         Create UART rx queue for communication between UART and app task.
- * @param  void
- * @return void
- */
-bool console_uart_init(P_CONSOLE_CALLBACK p_callback)
-{
-    p_console_callback = p_callback;
-
-    if ((g_console_uart.uart_tx_dma_enable) &&
-        (console_tx_dma_ch_num == 0xa5) &&
-        (!GDMA_channel_request(&console_tx_dma_ch_num, console_tx_dma_handler, true)))
-    {
-        g_console_uart.uart_tx_dma_enable = false;
-        APP_PRINT_ERROR0("console_uart_init: tx dma no free channel");
-    }
-
-    if ((g_console_uart.uart_rx_dma_enable) &&
-        (console_rx_dma_ch_num == 0xa5) &&
-        (!GDMA_channel_request(&console_rx_dma_ch_num, console_rx_dma_handler, true)))
-    {
-        g_console_uart.uart_rx_dma_enable = false;
-        APP_PRINT_ERROR0("console_uart_init: rx dma no free channel");
-    }
-
-    if (uart_rx_buf_addr != NULL)
-    {
-        free(uart_rx_buf_addr);
-    }
-
-    if (g_console_uart.uart_rx_dma_enable)
-    {
-        uart_rx_buf_addr = (uint8_t *)malloc(g_console_uart.uart_dma_rx_buffer_size);
-    }
-    else
-    {
-        uart_rx_buf_addr = (uint8_t *)malloc(UART_RX_FIFO_SIZE);
-    }
-
-    if (uart_rx_buf_addr == NULL)
-    {
-        APP_PRINT_ERROR0("console_uart_init: rx buffer malloc failed");
         return false;
     }
 
-    if (!g_console_uart.one_wire_uart_support)
+    console_uart_rx_mem = malloc((size_t)buffer_count * console_uart_rx_buf_size);
+    if (!console_uart_rx_mem)
     {
-        console_uart_driver_init();
+        return false;
     }
 
-    if (g_console_uart.uart_tx_dma_enable)
-    {
-        console_uart_tx_dma_init();
-    }
-
-    if (g_console_uart.uart_rx_dma_enable)
-    {
-        console_uart_rx_dma_init();
-    }
-
-    return p_console_callback(CONSOLE_EVT_OPENED, NULL, 0);
+    console_uart_rx_buf[0] = console_uart_rx_mem;
+#if defined(CONSOLE_UART_USE_ASYNC_DMA)
+    console_uart_rx_buf[1] = console_uart_rx_mem + console_uart_rx_buf_size;
+#endif
+    return true;
 }
 
-/**
- * @brief  APP console uart configure set.
- * @param  cfg the pointer for console uart parameter.
- * @return void
+static void console_uart_free_rx_buffers(void)
+{
+    free(console_uart_rx_mem);
+    console_uart_rx_mem = NULL;
+    console_uart_rx_buf[0] = NULL;
+#if defined(CONSOLE_UART_USE_ASYNC_DMA)
+    console_uart_rx_buf[1] = NULL;
+#endif
+    console_uart_rx_buf_size = 0U;
+}
+
+#if defined(CONSOLE_UART_USE_ASYNC_DMA)
+static bool console_uart_restart_async_rx(const struct device *dev)
+{
+    int ret;
+
+    console_uart_rx_next = 1U;
+    ret = uart_rx_enable(dev, console_uart_rx_buf[0], console_uart_rx_buf_size,
+                         CONSOLE_UART_RX_TIMEOUT);
+    if (ret != 0)
+    {
+        console_uart_notify(CONSOLE_EVT_ERROR, NULL, 0);
+        return false;
+    }
+    return true;
+}
+
+static void console_uart_async_cb(const struct device *dev,
+                                  struct uart_event *evt, void *user_data)
+{
+    (void)user_data;
+
+    switch (evt->type)
+    {
+    case UART_TX_DONE:
+        console_uart_notify(CONSOLE_EVT_DATA_XMIT, NULL, evt->data.tx.len);
+        break;
+
+    case UART_TX_ABORTED:
+        if (evt->data.tx.len)
+        {
+            console_uart_notify(CONSOLE_EVT_DATA_XMIT, NULL, evt->data.tx.len);
+        }
+        console_uart_notify(CONSOLE_EVT_ERROR, NULL, 0);
+        break;
+
+    case UART_RX_RDY:
+        /* new bytes live at buf[offset..offset+len); the console layer copies
+         * them out synchronously, so handing a transient pointer is safe. */
+        if (evt->data.rx.len)
+        {
+            console_uart_notify(CONSOLE_EVT_DATA_IND,
+                                &evt->data.rx.buf[evt->data.rx.offset],
+                                evt->data.rx.len);
+        }
+        break;
+
+    case UART_RX_BUF_REQUEST:
+        if (uart_rx_buf_rsp(dev, console_uart_rx_buf[console_uart_rx_next],
+                            console_uart_rx_buf_size) == 0)
+        {
+            console_uart_rx_next ^= 1U;
+        }
+        else
+        {
+            console_uart_notify(CONSOLE_EVT_ERROR, NULL, 0);
+        }
+        break;
+
+    case UART_RX_DISABLED:
+        if (console_uart_initialized)
+        {
+            (void)console_uart_restart_async_rx(dev);
+        }
+        break;
+
+    case UART_RX_STOPPED:
+        console_uart_notify(CONSOLE_EVT_ERROR, NULL, 0);
+        break;
+
+    case UART_RX_BUF_RELEASED:
+    default:
+        break;
+    }
+}
+#else
+static void console_uart_irq_cb(const struct device *dev, void *user_data)
+{
+    int received;
+
+    (void)user_data;
+
+    if (!uart_irq_update(dev))
+    {
+        return;
+    }
+
+    if (uart_err_check(dev) > 0)
+    {
+        console_uart_notify(CONSOLE_EVT_ERROR, NULL, 0);
+    }
+
+    while (uart_irq_rx_ready(dev))
+    {
+        received = uart_fifo_read(dev, console_uart_rx_buf[0], console_uart_rx_buf_size);
+        if (received <= 0)
+        {
+            break;
+        }
+        console_uart_notify(CONSOLE_EVT_DATA_IND, console_uart_rx_buf[0], received);
+    }
+
+    if (uart_irq_tx_ready(dev))
+    {
+        if (!console_uart_tx_active)
+        {
+            uart_irq_tx_disable(dev);
+            return;
+        }
+
+        if (console_uart_tx_offset < console_uart_tx_len)
+        {
+            received = uart_fifo_fill(dev, &console_uart_tx_buf[console_uart_tx_offset],
+                                      console_uart_tx_len - console_uart_tx_offset);
+            if (received > 0)
+            {
+                console_uart_tx_offset += received;
+            }
+        }
+
+        if ((console_uart_tx_offset == console_uart_tx_len) && uart_irq_tx_complete(dev))
+        {
+            uint32_t sent_len = console_uart_tx_len;
+
+            console_uart_tx_active = false;
+            uart_irq_tx_disable(dev);
+            console_uart_notify(CONSOLE_EVT_DATA_XMIT, NULL, sent_len);
+        }
+    }
+}
+#endif
+
+/*
+ * The application invokes console_uart_exit_low_power() from a
+ * POWER_STAGE_RESTORE callback.  Defer RX rearming until the power manager has
+ * completed the DLPS restore sequence and the system workqueue can run in
+ * normal thread context.
  */
+static void console_uart_exit_low_power_work_handler(struct k_work *work)
+{
+    (void)work;
+
+    if (!console_uart_initialized)
+    {
+        return;
+    }
+
+#if defined(CONSOLE_UART_USE_ASYNC_DMA)
+    /* UART_RX_DISABLED restarts DMA RX through console_uart_async_cb(). */
+    int ret = uart_rx_disable(console_uart_dev);
+
+    /*
+     * The RTL driver emits UART_RX_DISABLED even when RX was already stopped,
+     * then returns -EFAULT.  The callback restarts DMA in both cases.
+     */
+    if ((ret != 0) && (ret != -EFAULT))
+    {
+        console_uart_notify(CONSOLE_EVT_ERROR, NULL, 0);
+    }
+#endif
+
+    if (g_console_uart.callback)
+    {
+        g_console_uart.callback(CONSOLE_UART_EVENT_WAKE_UP);
+    }
+}
+
+K_WORK_DEFINE(console_uart_exit_low_power_work, console_uart_exit_low_power_work_handler);
+
+bool console_uart_write(uint8_t *buf, uint32_t len)
+{
+#if defined(CONSOLE_UART_USE_ASYNC_DMA)
+    if (!console_uart_initialized)
+    {
+        return false;
+    }
+    return uart_tx(console_uart_dev, buf, len, SYS_FOREVER_US) == 0;
+#else
+    unsigned int key;
+
+    if (!console_uart_initialized || !buf || !len)
+    {
+        return false;
+    }
+
+    key = irq_lock();
+    if (console_uart_tx_active)
+    {
+        irq_unlock(key);
+        return false;
+    }
+
+    console_uart_tx_buf = buf;
+    console_uart_tx_len = len;
+    console_uart_tx_offset = 0;
+    console_uart_tx_active = true;
+    irq_unlock(key);
+
+    uart_irq_tx_enable(console_uart_dev);
+    return true;
+#endif
+}
+
+bool console_uart_init(P_CONSOLE_CALLBACK p_callback)
+{
+    if (!device_is_ready(console_uart_dev))
+    {
+        return false;
+    }
+
+    if (console_uart_initialized)
+    {
+        return p_console_callback == p_callback;
+    }
+
+    if (!console_uart_alloc_rx_buffers())
+    {
+        return false;
+    }
+
+#if defined(CONSOLE_UART_USE_ASYNC_DMA)
+    if (uart_callback_set(console_uart_dev, console_uart_async_cb, NULL) != 0)
+    {
+        console_uart_free_rx_buffers();
+        return false;
+    }
+
+    console_uart_rx_next = 1U;
+    if (uart_rx_enable(console_uart_dev, console_uart_rx_buf[0], console_uart_rx_buf_size,
+                       CONSOLE_UART_RX_TIMEOUT) != 0)
+    {
+        console_uart_free_rx_buffers();
+        console_uart_rx_next = 0U;
+        return false;
+    }
+#else
+    if (uart_irq_callback_user_data_set(console_uart_dev, console_uart_irq_cb, NULL) != 0)
+    {
+        console_uart_free_rx_buffers();
+        return false;
+    }
+    uart_irq_rx_enable(console_uart_dev);
+#endif
+
+    p_console_callback = p_callback;
+    console_uart_initialized = true;
+
+    if (p_console_callback)
+    {
+        return p_console_callback(CONSOLE_EVT_OPENED, NULL, 0);
+    }
+    return true;
+}
+
 void console_uart_config_init(T_CONSOLE_UART_CONFIG *cfg)
 {
     memcpy(&g_console_uart, cfg, sizeof(T_CONSOLE_UART_CONFIG));
 }
+
+void console_uart_exit_low_power(POWERMode mode)
+{
+    (void)mode;
+
+    if (!console_uart_initialized)
+    {
+        return;
+    }
+
+    (void)k_work_submit(&console_uart_exit_low_power_work);
+}
+
+/* Hardware bring-up and wake pin configuration are owned by devicetree. */
+void console_uart_driver_init(void) { }
+bool console_uart_wakeup(void) { return true; }
+bool console_uart_tx_wakeup_enable(uint8_t pin) { (void)pin; return true; }
+bool console_uart_rx_wakeup_enable(uint8_t pin) { (void)pin; return true; }
+void console_uart_enter_low_power(POWERMode mode) { (void)mode; }

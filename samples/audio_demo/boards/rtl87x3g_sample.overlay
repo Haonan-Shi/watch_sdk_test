@@ -4,6 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/ {
+    chosen {
+        /* Route the RTK console transport onto uart3 through the Zephyr async
+         * UART driver. Change this phandle to move the console to any UART. */
+        realtek,console-uart = &uart3;
+    };
+};
+
 &uart3 {
     pinctrl-0 = <&uart3_default>;
     pinctrl-1 = <&uart3_sleep>;
@@ -25,17 +33,17 @@
 {
     uart3_default:uart3_default {
         group1 {
-            psels = <RTL87X3G_PSEL(UART3_TX, P2_2, DIR_OUT, DRV_HIGH, PULL_UP)>,
-            <RTL87X3G_PSEL(UART3_RX, P2_3, DIR_IN, DRV_HIGH, PULL_UP)>;
+            psels = <RTL87X3G_PSEL(UART3_TX, P3_1, DIR_OUT, DRV_HIGH, PULL_UP)>,
+            <RTL87X3G_PSEL(UART3_RX, P3_0, DIR_IN, DRV_HIGH, PULL_UP)>;
         };
     };
  
     uart3_sleep:uart3_sleep {
         group1 {
-            psels = <RTL87X3G_PSEL(SW_MODE, P2_2, DIR_OUT, DRV_HIGH, PULL_UP)>;
+            psels = <RTL87X3G_PSEL(SW_MODE, P3_1, DIR_OUT, DRV_HIGH, PULL_UP)>;
         };
         group2 {
-            psels = <RTL87X3G_PSEL(SW_MODE, P2_3, DIR_IN, DRV_HIGH, PULL_UP)>;
+            psels = <RTL87X3G_PSEL(SW_MODE, P3_0, DIR_IN, DRV_HIGH, PULL_UP)>;
             wakeup-low;
         };
     };
