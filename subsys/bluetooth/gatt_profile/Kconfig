@@ -1,0 +1,135 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+# This Kconfig file is picked by the Zephyr build system because it is defined
+# as the module Kconfig entry point (see zephyr/module.yml). You can browse
+# module options by going to Zephyr -> Modules in Kconfig.
+
+
+menu "Realtek Subsys BLE GATT Profiles"
+    menu "Client"
+        config REALTEK_SUBSYS_GATT_PROFILE_AMS_CLIENT
+            bool "Enable Realtek GATT profile AMS client"
+            default n
+            help
+                Realtek GATT profile AMS client support.
+        
+        config REALTEK_SUBSYS_GATT_PROFILE_ANCS_CLIENT
+            bool "Enable Realtek GATT profile ANCS client"
+            default n
+            help
+                Realtek GATT profile ANCS client support.
+
+        config REALTEK_SUBSYS_GATT_PROFILE_ASP_CLIENT
+            bool "Enable Realtek GATT profile ASP client"
+            default n
+            help
+                Realtek GATT profile ASP client support.
+
+        config REALTEK_SUBSYS_GATT_PROFILE_BAS_CLIENT
+            bool "Enable Realtek GATT profile BAS client"
+            default n
+            help
+                Realtek GATT profile BAS client support.
+
+        config REALTEK_SUBSYS_GATT_PROFILE_DIS_CLIENT
+            bool "Enable Realtek GATT profile DIS client"
+            default n
+            help
+                Realtek GATT profile DIS client support.
+
+        config REALTEK_SUBSYS_GATT_PROFILE_GAPS_CLIENT
+            bool "Enable Realtek GATT profile GAPS client"
+            default n
+            help
+                Realtek GATT profile GAPS client support.
+
+        config REALTEK_SUBSYS_GATT_PROFILE_HID_OVER_ISO_CLIENT
+            bool "Enable Realtek GATT profile HID over ISO client"
+            default n
+            help
+                Realtek GATT profile HID over ISO client support.
+
+        config REALTEK_SUBSYS_GATT_PROFILE_HIDS_CFU_CLIENT
+            bool "Enable Realtek GATT profile HIDS CFU client"
+            default n
+            help
+                Realtek GATT profile HIDS CFU client support.
+
+        config REALTEK_SUBSYS_GATT_PROFILE_HIDS_CLIENT
+            bool "Enable Realtek GATT profile HIDS client"
+            default n
+            help
+                Realtek GATT profile HIDS client support.
+
+        config REALTEK_SUBSYS_GATT_PROFILE_IAS_CLIENT
+            bool "Enable Realtek GATT profile IAS client"
+            default n
+            help
+                Realtek GATT profile IAS client support.
+    endmenu
+    menu "Server"
+        config REALTEK_SUBSYS_GATT_PROFILE_ASP_SERVER
+            bool "Enable Realtek GATT profile ASP server"
+            default n
+            help
+                Realtek GATT profile ASP server support.
+        
+        config REALTEK_SUBSYS_GATT_PROFILE_BAS_SERVER
+            bool "Enable Realtek GATT profile BAS server"
+            default n
+            help
+                Realtek GATT profile BAS server support.
+
+        config REALTEK_SUBSYS_GATT_PROFILE_DIS_SERVER
+            bool "Enable Realtek GATT profile DIS server"
+            default n
+            help
+                Realtek GATT profile DIS server support.
+
+        config REALTEK_SUBSYS_GATT_PROFILE_HID_OVER_ISO_SERVER
+            bool "Enable Realtek GATT profile HID over ISO server"
+            default n
+            help
+                Realtek GATT profile HID over ISO server support.
+
+        config REALTEK_SUBSYS_GATT_PROFILE_HIDS_CFU_SERVER
+            bool "Enable Realtek GATT profile HIDS CFU server"
+            default n
+            help
+                Realtek GATT profile HIDS CFU server support.
+
+        config REALTEK_SUBSYS_GATT_PROFILE_HIDS_SERVER
+            bool "Enable Realtek GATT profile HIDS server"
+            default n
+            help
+                Realtek GATT profile HIDS server support.
+
+        config REALTEK_SUBSYS_GATT_PROFILE_IAS_SERVER
+            bool "Enable Realtek GATT profile IAS server"
+            default n
+            help
+                Realtek GATT profile IAS server support.
+
+        config REALTEK_SUBSYS_GATT_PROFILE_TPS_SERVER
+            bool "Enable Realtek GATT profile TPS server"
+            default n
+            help
+                Realtek GATT profile TPS server support.
+
+        config REALTEK_SUBSYS_GATT_PROFILE_TRANSMIT_SVC_DONGLE_SERVER
+            bool "Enable Realtek GATT profile transmit dongle server"
+            default n
+            help
+                Realtek GATT profile transmit dongle server support.
+        
+        config REALTEK_SUBSYS_GATT_PROFILE_HRS_SERVER
+            bool "Enable Realtek GATT profile HRS server"
+            default n
+            help
+                Realtek GATT profile HRS server support.
+    endmenu
+endmenu

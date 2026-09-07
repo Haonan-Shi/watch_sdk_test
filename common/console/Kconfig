@@ -1,0 +1,13 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "Realtek Common Module Console"
+config REALTEK_COMMON_MODULE_CONSOLE
+    bool "Enable Realtek Common Module Console"
+    default n
+    help
+       Realtek common module console support.
+endmenu

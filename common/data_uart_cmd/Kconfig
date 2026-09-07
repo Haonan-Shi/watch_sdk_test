@@ -1,0 +1,13 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "Realtek Common Module Data Uart Cmd"
+config REALTEK_COMMON_MODULE_DATA_UART_CMD
+    bool "Enable Realtek Common Module Data Uart Cmd"
+    default n
+    help
+        Realtek common module data uart cmd support.
+endmenu

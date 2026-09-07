@@ -1,0 +1,228 @@
+/***********************************************************************
+*                    SEGGER Microcontroller GmbH                       *
+*                        The Embedded Experts                          *
+************************************************************************
+*                                                                      *
+*                  (c) SEGGER Microcontroller GmbH                     *
+*                        All rights reserved                           *
+*                          www.segger.com                              *
+*                                                                      *
+************************************************************************
+*                                                                      *
+************************************************************************
+*                                                                      *
+*                                                                      *
+*  Licensing terms                                                     *
+*                                                                      *
+* The use in source and binary forms, with or without modification,    *
+* is permitted for internal use only. The redistribution to any        *
+* third party is prohibited.                                           *
+*                                                                      *
+*                                                                      *
+* THIS SOFTWARE IS PROVIDED BY COPYRIGHT HOLDER "AS IS" AND ANY        *
+* EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE    *
+* IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR   *
+* PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDER BE        *
+* LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY,     *
+* OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,             *
+* PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR   *
+* PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY  *
+* OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT         *
+* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE    *
+* USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH     *
+* DAMAGE.                                                              *
+*                                                                      *
+************************************************************************
+
+-------------------------- END-OF-HEADER -----------------------------
+
+Purpose: Example showing the JTAG => SWD switching sequence as
+         documented by ARM.
+Literature:
+  [1]  J-Link User Guide
+  [2]  Cortex-M Technical Reference Manual
+*/
+
+/*********************************************************************
+*
+*       Constants
+*
+**********************************************************************
+*/
+//
+// Data to be sent to target.
+//
+const U8 _aIn[] = {
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,              // SWD line reset.
+  0x75, 0x77, 0x77, 0x67,                                // JTAG -> SWD switching sequence.
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,              // SWD line reset.
+  0x00, 0x00,                                            // Make sure SWD is ready for a start bit.
+  0xA5,                                                  // "Read ID" command (DP:00).
+  0x00, 0x00, 0x00, 0x00, 0x00                           // Receive: ACK + ID.
+};
+
+//
+// Direction buffer for transmission.
+//
+const U8 _aDir[] = {
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 
+  0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+  0xFF, 0xFF,
+  0xFF,
+  0x00, 0x00, 0x00, 0x00, 0xF0
+};
+
+/*********************************************************************
+*
+*       Static code
+*
+**********************************************************************
+*/
+
+/*********************************************************************
+*
+*       _SWD_BufGetU32
+*
+*  Function descripton
+*    Get unsigned 32 bit value from an SWD transmission buffer.
+*
+*  Parameters
+*    pData  Buffer containing data read via SWD.
+*    Pos    Position from which the U32 should be read.
+*
+*  Return value
+*    >= 0:  U32 read.
+*/
+static U32 _SWD_BufGetU32(U8* pData, U32 Pos) {
+  U32 iStart;
+  U32 BitsRem;
+  U32 Shift;
+  U32 Result;
+  U8  v;
+  U8 Mask;
+  
+  iStart  = Pos >> 3;              // Divide by 8.
+  BitsRem = (Pos & 7);             // Modulo 8 to get remaining bits.
+  Shift   = 31 - (BitsRem - 1);    // Get required shift.
+  Mask    = 0xFF >> (8 - BitsRem); // Get mask for remaining bits
+  Result = 0
+         | (*(pData + iStart + 0) <<  0)
+         | (*(pData + iStart + 1) <<  8)
+         | (*(pData + iStart + 2) << 16)
+         | (*(pData + iStart + 3) << 24)
+         ;
+  Result >>= BitsRem;              // Shift to be 32-bit aligned.
+  if (BitsRem != 0) {              // We have remaining bits? => Add them.
+    v  = *(pData + iStart + 4);
+    v &= Mask;
+    Result |= (v << Shift);
+  }
+  return Result;
+}
+
+/*********************************************************************
+*
+*       Global functions
+*
+**********************************************************************
+*/
+
+/*********************************************************************
+*
+*       InitTarget()
+*
+*  Function description
+*    If present, called right before performing generic connect sequence.
+*    Usually used for targets which need a special connect sequence.
+*    E.g.: TI devices with ICEPick TAP on them where core TAP needs to be enabled via specific ICEPick sequences first.
+*
+*  Return value
+*    >= 0:  O.K.
+*     < 0:  Error
+*
+*  Notes
+*    (1) Must not use high-level API functions like JLINK_MEM_ etc.
+*    (2) For target interface JTAG, this device has to setup the JTAG chain + JTAG TAP Ids.
+*/
+int InitTarget(void) {
+  int IdPos;
+  int r;
+  U32 Id;
+  U32 aon_fast_boot_value;
+  U32 test;
+  U8 aOut[33];
+  //
+  // Store raw data in buffer.
+  //
+  r = JLINK_SWD_ReadWriteBits(&_aIn[0], &_aDir[0], &aOut[0], 26 * 8);
+  //
+  // Transfer buffer to target and get the result.
+  // ID location in buffer:
+  //   9*8 bits switching sequence JTAG => SWD.
+  //   9*8 bits luminary switching sequence (backwards compatibility only).
+  //   9*8 bits line reset.
+  //   1*8 bits read ID command.
+  //   3   bits Skip "ACK" from target.
+  //   => ID data can be read from Bitpos + 28*8 + 3 input buffer offset.
+  //
+  Id = _SWD_BufGetU32(&aOut[0], 19 * 8 + 3);
+  if ((Id & 0x0FF00FFF) == 0xBA00477) {
+    JLINK_SYS_Report1("Found SW-DP with ID ", Id);
+  } else {
+    JLINK_SYS_Report1("No valid SWD-DP found. Expected pattern 0xBA00477, found pattern: ", Id);
+  }
+  
+
+  
+  return 0;
+}
+
+//APAddr 0x00000D00
+
+int ConfigTargetSettings(void) {
+  JLINK_ExecCommand("CORESIGHT_AddAP = Index=0 Type=APB-AP Addr=0x00000D00");
+  JLINK_ExecCommand("CORESIGHT_SetIndexAHBAPToUse = 0");             // Define which APB-AP to use for debugging (the one that is connected to the core)
+  return 0;
+}
+
+/*********************************************************************
+*
+*       AfterResetTarget()
+*
+*/
+
+ int AfterResetTarget(void) {
+  U32 aon_fast_boot_value;
+  U32 test;
+  //RTL87x3G btaon_fast_write
+  // #define SYSON_BASE               0x40000000 
+  // #define REG_AON_FW_ONREG    0x48
+  // #define AON_FAST_BOOT                       0x400
+  
+  //1.read back aon_fast_boot_value
+   JLINK_MEM_WriteU32(0x40000048,0x8000000);
+
+   aon_fast_boot_value = JLINK_MEM_ReadU32(0x40000048);
+   JLINK_SYS_Report1("Modified aon_fast_boot_value: ", aon_fast_boot_value);
+  //2.clear BOOT_DONE 
+   aon_fast_boot_value &= ~3;
+  //3. write back aon reg
+   JLINK_MEM_WriteU32(0x40000048,0x8000000);
+
+
+   JLINK_MEM_WriteU32(0x40000048,0x8000001);
+
+
+   JLINK_MEM_WriteU32(0x40000048,0x8000000);
+
+   
+   JLINK_MEM_WriteU32(0x40000048,0x8000000);
+
+   aon_fast_boot_value = JLINK_MEM_ReadU32(0x40000048);
+   JLINK_SYS_Report1("Modified aon_fast_boot_value123: ", aon_fast_boot_value);
+   JLINK_SYS_Report1("Modified aon_fast_boot_value123: ", aon_fast_boot_value);
+ }
+
+
+/*************************** end of file ****************************/

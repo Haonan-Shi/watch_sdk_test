@@ -1,0 +1,12 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+if BOARD_RTL87X3G_BT_AUDIO_TRX
+
+config BOARD
+	default "rtl87x3g_bt_audio_trx"
+
+endif #BOARD_RTL87X3G_BT_AUDIO_TRX

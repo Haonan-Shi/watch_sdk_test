@@ -1,0 +1,39 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+	  
+config REALTEK_FINDMY_FEATURE_SUPPORT
+    bool "Enable Find My Network Feature"
+    default n
+    help
+      Enable this option to support Apple Find My Network features.
+
+config REALTEK_FINDMY_USE_UARP
+    bool "Enable Find My Firmware Update"
+    depends on REALTEK_FINDMY_FEATURE_SUPPORT
+    default n
+    help
+      Enable this option to support firmware update function.
+
+config REALTEK_FINDMY_SUPPORT_NFC
+    bool "Enable Find My NFC Support"
+    depends on REALTEK_FINDMY_FEATURE_SUPPORT
+    default n
+    help
+      Enable this option to support NFC features for Find My.
+
+config REALTEK_FINDMY_SUPPORT_CUSTOMIZED_APP
+    bool "Enable Find My Customized App Support"
+    depends on REALTEK_FINDMY_FEATURE_SUPPORT
+    default n
+    help
+      Enable this option to support customized app interactions, instead of GFPS or system standard behavior.
+
+config REALTEK_FINDMY_SUPPORT_DYNAMIC_SERVICE
+    bool "Enable Find My Dynamic Service Availability"
+    depends on REALTEK_FINDMY_FEATURE_SUPPORT
+    default n
+    help
+      Enable this option to support Service Availability feature.

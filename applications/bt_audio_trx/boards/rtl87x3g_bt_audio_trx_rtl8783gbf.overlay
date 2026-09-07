@@ -1,0 +1,275 @@
+/*
+ * Copyright (c) 2026, Realtek Semiconductor Corporation
+ *
+ * SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+ */
+
+#include <zephyr/dt-bindings/gpio/realtek-rtl87x3g-gpio.h>
+#include <dt-bindings/pinctrl/rtl87x3g-pinctrl.h>
+#include <dt-bindings/input/input-event-codes.h>
+#include <rtl87x3g-display-lcd.dtsi>
+
+&gpioa {
+	status = "okay";
+};
+
+/ {
+    chosen {
+        zephyr,console = &uart2;
+        zephyr,shell-uart = &uart2;
+    };
+};
+
+/**
+#define GDMA_Handshake_UART0_TX                                     (0)
+#define GDMA_Handshake_UART0_RX                                     (1)
+#define GDMA_Handshake_UART2_TX                                     (2)
+#define GDMA_Handshake_UART2_RX                                     (3)
+#define GDMA_Handshake_UART3_TX                                     (48)
+#define GDMA_Handshake_UART3_RX                                     (49)
+#define GDMA_Handshake_UART4_TX                                     (50)
+#define GDMA_Handshake_UART4_RX                                     (51)
+#define GDMA_Handshake_UART5_TX                                     (52)
+#define GDMA_Handshake_UART5_RX                                     (53)
+*/
+
+&uart0 {
+	pinctrl-0 = <&uart0_default>;
+	pinctrl-1 = <&uart0_sleep>;
+	pinctrl-names = "default", "sleep";
+	status = "okay";
+	current-speed = <2000000>;
+	parity = "none";
+	stop-bits = "1";
+	data-bits = <8>;
+	dmas = <&dma0 2 1 0xa>, <&dma0 3 0 0x10021>;
+	dma-names = "rx", "tx";
+};
+
+&pinctrl
+{
+	uart0_default:uart0_default {
+		group1 {
+			psels = <RTL87X3G_PSEL(UART0_TX, UART0_TX_PIN, DIR_OUT, DRV_HIGH, PULL_UP)>,
+			<RTL87X3G_PSEL(UART0_RX, UART0_RX_PIN, DIR_IN, DRV_HIGH, PULL_UP)>;
+		};
+	};
+
+	uart0_sleep:uart0_sleep {
+		group1 {
+			psels = <RTL87X3G_PSEL(SW_MODE, UART0_TX_PIN, DIR_OUT, DRV_HIGH, PULL_UP)>;
+		};
+		group2 {
+			psels = <RTL87X3G_PSEL(SW_MODE, UART0_RX_PIN, DIR_IN, DRV_HIGH, PULL_UP)>;
+			wakeup-low;
+		};
+	};
+};
+
+
+&uart2 {
+	pinctrl-0 = <&uart2_default>;
+	pinctrl-1 = <&uart2_sleep>;
+	pinctrl-names = "default", "sleep";
+	status = "okay";
+	current-speed = <115200>;
+	parity = "none";
+	stop-bits = "1";
+	data-bits = <8>;
+	//dmas = <&dma0 2 3 0xa>, <&dma0 3 2 0x10021>;
+	//dma-names = "rx", "tx";
+};
+
+&pinctrl
+{
+	uart2_default:uart2_default {
+		group1 {
+			psels = <RTL87X3G_PSEL(UART2_TX, UART2_TX_PIN, DIR_OUT, DRV_HIGH, PULL_UP)>,
+			<RTL87X3G_PSEL(UART2_RX, UART2_RX_PIN, DIR_IN, DRV_HIGH, PULL_UP)>;
+		};
+	};
+
+	uart2_sleep:uart2_sleep {
+		group1 {
+			psels = <RTL87X3G_PSEL(SW_MODE, UART2_TX_PIN, DIR_OUT, DRV_HIGH, PULL_UP)>;
+		};
+		group2 {
+			psels = <RTL87X3G_PSEL(SW_MODE, UART2_RX_PIN, DIR_IN, DRV_HIGH, PULL_UP)>;
+			wakeup-low;
+		};
+	};
+
+	gpio_keys: gpio_keys{
+		compatible = "realtek,gpio-keys";
+		debounce-interval-ms = <30>;
+		key2: key2{
+			gpios = <KEY2_GPIO_PIN (GPIO_ACTIVE_LOW | GPIO_PULL_UP| RTL87X3G_GPIO_INPUT_PM_WAKEUP)>;
+			label = "key2";
+			key,id = <INPUT_BTN_2>;
+			status = "okay";
+		};
+	};
+
+};
+
+&dma0 {
+	status = "okay";
+};
+
+&gpioa {
+	status = "okay";
+};
+
+&gpiob {
+	status = "okay";
+};
+
+&rtc {
+    status = "disabled";
+	channels = <1>;
+    prescaler = <1>;
+};
+
+
+&sdhc1 {
+	pwr-gpios = <SDHC1_PWR_GPIO_PIN GPIO_ACTIVE_HIGH>;
+	status = "okay";
+};
+
+&sdcard_disk0 {
+	status = "okay";
+};
+
+&display_lcd {
+	status = "okay";
+};
+
+
+/ {
+    chosen {
+        zephyr,display = &display_lcd;
+    };
+};
+
+&i2c1 {
+	status = "okay";
+	clock-frequency = <400000>;
+	touch_device: touch_chsc6417@2e {
+		compatible = "chipsemi,chsc6417";
+		reg = <0x2E>;
+		irq-gpios = <TP_INT_GPIO_PIN GPIO_ACTIVE_HIGH>;
+		rst-gpios = <TP_RST_GPIO_PIN GPIO_ACTIVE_HIGH>;
+		gesture-release-timeout-ms = <30>;
+		status = "okay";
+	};
+};
+
+
+/*delete-node only support nodes with lable */
+/delete-node/ &dtcm;
+/delete-node/ &heap_dtcm;
+/delete-node/ &sram;
+/delete-node/ &heap_sram;
+/delete-node/ &itcm;
+/delete-node/ &heap_itcm;
+/delete-node/ &dsp_share_ram;
+/delete-node/ &timer4;
+/delete-node/ &timer5;
+/delete-node/ &timer6;
+/delete-node/ &timer7;
+/delete-node/ &timer8;
+
+
+/ {
+	aliases {
+		qdec0 = &qdec;
+		dma-0 = &dma0;
+		rtc = &rtc;
+		sdhc0 = &sdhc0;
+		i2c-1 = &i2c1;
+		ext-amp = &ext_amp;
+    };
+
+	gpio_output{
+		compatible = "gpio-leds";
+		ext_amp: ext_amp{
+			//P2_5       19  /*!< GPIOA20 */
+			gpios = <EXT_AMP_GPIO_PIN GPIO_ACTIVE_HIGH>;
+			label = "ext amp control pin";
+			status = "disabled";
+		};
+	};
+
+	
+	/* DTCM addr: 0x20000000~0x20020000, total size: 128KByte.
+	 * The front 46Kbyte was taken by RTK internal.
+	 * If users wants to increase global variables and zephyr static heap,
+	 * please follow the steps:
+	 * 1. increase dtcm size value "reg = <0x2000B800 DT_SIZE_K(NEW_SIZE)>"
+	 * 2. modify heap_dtcm addr label "heap_dtcm: memory@NEW_ADDR"
+	 * 3. modify heap_dtcm reg addr "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * 4. decrease heap_dtcm size value "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * Warning: 
+	 * 1. the dtcm address should NOT modified!
+	 * 2. the dtcm plus heap_dtcm size should NOT exceed 82KByte!
+	 */
+	dtcm {
+		dtcm: memory@2000b800 {
+			device_type = "dtcm region";
+			reg = <0x2000B800 DT_SIZE_K(81)>;
+		};
+		heap_dtcm: memory@2001fc00 {
+			device_type = "heap dtcm region";
+			reg = <0x2001FC00 DT_SIZE_K(1)>;
+		};
+	};
+	/* sram addr: 0x20020000~0x20048000, total size: 160KByte.
+	 * call zephyr_code_relocate(FILES xxx.x LOCATION SRAM) at cmakelist could relocate variables on sram. 
+	 * for more information, please refer to https://docs.zephyrproject.org/latest/kernel/code-relocation.html
+	 * If users wants to increase sram size, please follow the steps:
+	 * 1. increase sram size value "reg = <0x20020000 DT_SIZE_K(NEW_SIZE)>"
+	 * 2. modify heap_sram addr label "heap_sram: memory@NEW_ADDR"
+	 * 3. modify heap_sram reg addr "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * 4. decrease heap_sram size value "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * Warning: 
+	 * 1. the sram address should NOT modified!
+	 * 2. the sram plus heap_sram size should NOT exceed 160KByte!
+	 */
+	sram {
+		sram: memory@20020000 {
+			device_type = "sram region";
+			compatible = "zephyr,memory-region", "mmio-sram";
+			reg = <0x20020000 DT_SIZE_K(32)>;
+			zephyr,memory-region = "SRAM";
+		};
+		heap_sram: memory@20028000 {
+			device_type = "heap sram region";
+			reg = <0x20028000 DT_SIZE_K(128)>;
+		};
+	};
+
+	itcm {
+		itcm: memory@c0c00 {
+			device_type = "itcm region";
+			compatible = "zephyr,memory-region", "arm,itcm";
+			zephyr,memory-region = "ITCM";
+			reg = <0xC0C00 DT_SIZE_K(38)>;
+		};
+		heap_itcm: memory@CA400 {
+			device_type = "heap itcm region";
+			reg = <0xCA400 DT_SIZE_K(55)>;
+		};
+	};
+	
+/**
+	dsp_ram {
+		dsp_share_ram: memory@20048000 {
+			compatible = "zephyr,memory-region";
+			device_type = "dsp_share_ram region";
+			zephyr,memory-region = "DSPRAM";
+			reg = <0x20048000 DT_SIZE_K(80)>;
+		};
+	};
+*/	
+};
+

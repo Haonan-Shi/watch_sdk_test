@@ -1,0 +1,12 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+if BOARD_RTL87X3G_WATCH
+
+config BOARD
+	default "rtl87x3g_watch"
+
+endif #BOARD_RTL87x3G_WATCH

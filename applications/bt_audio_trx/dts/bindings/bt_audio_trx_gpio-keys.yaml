@@ -1,0 +1,19 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+description: |
+    gpio keys for bt_audio_trx project.
+
+compatible: "bt_audio_trx_gpio-keys"
+
+properties:
+  gpios:
+    type: phandle-array
+    required: true
+
+  label:
+    type: string
+    required: true

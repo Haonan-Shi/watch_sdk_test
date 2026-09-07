@@ -1,0 +1,61 @@
+/*
+ * Copyright(c) 2025, Realtek Semiconductor Corporation.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+#include <zephyr/dt-bindings/pinctrl/rtl87x3g-pinctrl.h>
+#include "board_pin_assignments/rtl8773gtp/board.h"
+
+&pinctrl
+{
+	uart2_default:uart2_default {
+		group1 {
+			psels = <RTL87X3G_PSEL(UART2_TX, UART2_TX_PIN, DIR_OUT, DRV_HIGH, PULL_UP)>,
+			<RTL87X3G_PSEL(UART2_RX, UART2_RX_PIN, DIR_IN, DRV_HIGH, PULL_UP)>;
+		};
+	};
+
+	uart2_sleep:uart2_sleep {
+		group1 {
+			psels = <RTL87X3G_PSEL(SW_MODE, UART2_TX_PIN, DIR_OUT, DRV_HIGH, PULL_UP)>;
+		};
+		group2 {
+			psels = <RTL87X3G_PSEL(SW_MODE, UART2_RX_PIN, DIR_IN, DRV_HIGH, PULL_UP)>;
+			wakeup-low;
+		};
+	};
+
+	sdhc0_default: sdhc0_default {
+		group1 {
+				psels = 
+				<RTL87X3G_PSEL(HS_P5_0_SDH0_CLK, SD_SDHC_CLK_PIN, DIR_OUT, DRV_HIGH, PULL_UP)>,
+				<RTL87X3G_PSEL(HS_P5_1_SDH0_CMD, SD_SDHC_CMD_PIN, DIR_OUT, DRV_HIGH, PULL_UP)>,
+				<RTL87X3G_PSEL(HS_P5_2_SDH0_DATA0, SD_SDHC_DATA0_PIN, DIR_OUT, DRV_HIGH, PULL_UP)>;
+				bias-pull-strong;
+		};
+	};
+
+	sdhc0_sleep: sdhc0_sleep {
+		group1 {
+				psels = 
+				<RTL87X3G_PSEL(SW_MODE, SD_SDHC_CLK_PIN, DIR_IN, DRV_LOW, PULL_DOWN)>,
+				<RTL87X3G_PSEL(SW_MODE, SD_SDHC_CMD_PIN, DIR_IN, DRV_LOW, PULL_DOWN)>,
+				<RTL87X3G_PSEL(SW_MODE, SD_SDHC_DATA0_PIN, DIR_IN, DRV_LOW, PULL_DOWN)>;
+		};
+	};
+
+	i2c1_default:i2c1_default {
+		group1 {
+			psels = 
+			/* only pull up/pull down/pull none is active when pad is in pinmux mode */
+			<RTL87X3G_PSEL(I2C1_CLK, I2C1_SCL_PIN, DIR_OUT, DRV_HIGH, PULL_NONE)>,
+			<RTL87X3G_PSEL(I2C1_DAT, I2C1_SDA_PIN, DIR_OUT, DRV_HIGH, PULL_NONE)>;
+		};
+	};
+	i2c1_sleep:i2c1_sleep {
+		group1 {
+			psels = 
+			<RTL87X3G_PSEL(SW_MODE, I2C1_SCL_PIN, DIR_IN, DRV_LOW, PULL_UP)>,
+			<RTL87X3G_PSEL(SW_MODE, I2C1_SDA_PIN, DIR_IN, DRV_LOW, PULL_UP)>;
+		};
+	};
+};

@@ -1,0 +1,19 @@
+/*
+ * Copyright(c) 2026, Realtek Semiconductor Corporation.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <zephyr/dt-bindings/gpio/realtek-rtl87x3g-gpio.h>
+#include <dt-bindings/pinctrl/rtl87x3g-pinctrl.h>
+
+&i2c1 {
+    touch_device: touch_chsc6417@2e {
+        compatible = "chipsemi,chsc6417";
+        reg = <0x2E>;
+        irq-gpios = <TP_INT_GPIO_PIN GPIO_ACTIVE_HIGH>;
+        rst-gpios = <TP_RST_GPIO_PIN GPIO_ACTIVE_HIGH>;
+        gesture-release-timeout-ms = <30>;
+        status = "okay";
+    };
+};

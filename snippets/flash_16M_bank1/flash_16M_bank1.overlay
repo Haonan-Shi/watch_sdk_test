@@ -1,0 +1,115 @@
+/*
+ * Copyright(c) 2025, Realtek Semiconductor Corporation.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+/delete-node/ &flash;
+
+/ { 
+    chosen {
+		zephyr,code-partition = &bank_app_partition;
+	};
+	aliases {
+		vp-data = &vp_data_resion;
+	};
+    soc{ flash-controller@40022000 {
+    flash: flash@70000000 {
+		compatible = "soc-nv-flash";
+		write-block-size = <1>;
+		erase-block-size = <4096>;
+		reg = <0x70000000 DT_SIZE_K(16384)>;
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			eq_fitting: partition@0 {
+				label = "eq-fitting";
+				reg = <0x0 DT_SIZE_K(1)>;
+			};
+			reserved: partition@400 {
+				label = "reserved-image";
+				reg = <0x400 DT_SIZE_K(7)>;
+			};
+			config_file: partition@2000 {
+				label = "config-file-image";
+				reg = <0x2000 DT_SIZE_K(5)>;
+			};
+			boot_patch_0: partition@4000 {
+				label = "boot-patch-0-image";
+				reg = <0x4000 DT_SIZE_K(12)>;
+			};
+			boot_patch_1: partition@7000 {
+				label = "boot-patch-1-image";
+				reg = <0x7000 DT_SIZE_K(12)>;
+			};
+			bt_host: partition@a000 {
+				label = "bt_host";
+				reg = <0xA000 DT_SIZE_K(252)>;
+			};
+			bank1_ota_header: partition@29e000 {
+				label = "ota-header-image";
+				reg = <0x29e000 DT_SIZE_K(1)>;
+			};
+			bank1_stack_patch: partition@29f000 {
+				label = "stack-patch-image";
+				reg = <0x29f000 DT_SIZE_K(200)>;
+			};
+			bank1_system_patch: partition@2d1000 {
+				label = "system-patch-image";
+				reg = <0x2d1000 DT_SIZE_K(136)>;
+			};
+			bank_app_partition: partition@2f3000 {
+				label = "app-image";
+				reg = <0x2f3000 DT_SIZE_K(1444)>;
+			};
+			bank1_dsp_sys: partition@45c000 {
+				label = "bank_dsp_sys-image";
+				reg = <0x45c000 DT_SIZE_K(360)>;
+			};
+			bank1_dsp_app: partition@4b6000 {
+				label = "bank_dsp_app-image";
+				reg = <0x4b6000 DT_SIZE_K(196)>;
+			};
+			bank1_dsp_cfg: partition@4e7000 {
+				label = "bank_dsp_cfg-image";
+				reg = <0x4e7000 DT_SIZE_K(40)>;
+			};
+			bank1_app_cfg: partition@4f1000 {
+				label = "bank_app_cfg-image";
+				reg = <0x4f1000 DT_SIZE_K(8)>;
+			};
+			vp_data_resion: partition@4f3000 {
+				label = "vp_data-image";
+				reg = <0x4f3000 DT_SIZE_K(200)>;
+			};
+			
+			bkp_data2_region: partition@525000 {
+				label = "bkp_data2-image";
+				reg = <0x525000 DT_SIZE_K(8)>;
+			};
+			
+			app_defined_region: partition@527000 {
+				label = "APP-Defined-Region";
+				reg = <0x527000 DT_SIZE_K(60)>;
+			};
+			
+			userdata1_region: partition@536000 {
+				label = "Userdata1";
+				reg = <0x536000 DT_SIZE_K(10864)>;
+			};
+			
+			userdata2_region: partition@fd2000 {
+				label = "Userdata2";
+				reg = <0xfd2000 DT_SIZE_K(100)>;
+			};
+
+			ftl_region: partition@FEB000 {
+				label = "realtek-ftl-region";
+				reg = <0xFEB000 DT_SIZE_K(84)>; 
+			};
+		};
+    };
+};};};
+
+
+
+

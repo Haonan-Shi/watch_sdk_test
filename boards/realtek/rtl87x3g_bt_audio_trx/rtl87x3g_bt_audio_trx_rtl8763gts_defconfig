@@ -1,0 +1,20 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+#DISASSEMBLY
+CONFIG_OUTPUT_DISASSEMBLY=y
+
+# Console Driver
+# CONFIG_CONSOLE=y
+# CONFIG_UART_CONSOLE=y
+
+# UART Driver
+# CONFIG_SERIAL=y
+# CONFIG_UART_INTERRUPT_DRIVEN=y
+# CONFIG_UART_ASYNC_API=y
+
+# Enable HW stack protection
+CONFIG_HW_STACK_PROTECTION=y

@@ -1,0 +1,35 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "Realtek Common Module gfps"
+
+config REALTEK_COMMON_MODULE_GFPS
+    bool "Enable Realtek Common Module GFPS"
+    default n
+    help
+        Realtek common module gfps support.
+
+config REALTEK_GFPS_FEATURE_SUPPORT
+    bool "Enable GFPS Feature"
+    default n
+    help
+      Enable this option to support Google Fast Pair Service (GFPS) features.
+
+config REALTEK_GFPS_FINDER_SUPPORT
+    bool "Enable GFPS Finder Support"
+    depends on REALTEK_GFPS_FEATURE_SUPPORT
+    default n
+    help
+      Enable this option to support GFPS Finder features. Requires GFPS Feature enabled.
+
+config REALTEK_GFPS_LE_DEVICE_SUPPORT
+    bool "Enable GFPS Bluetooth LE Device Support"
+    depends on REALTEK_GFPS_FEATURE_SUPPORT
+    default n
+    help
+      Enable this option to support GFPS Bluetooth Low Energy device features. Requires GFPS Feature enabled.
+
+endmenu

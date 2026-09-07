@@ -1,0 +1,3 @@
+name: flash_16M_bank0
+append:
+  EXTRA_DTC_OVERLAY_FILE: flash_16M_bank0.overlay

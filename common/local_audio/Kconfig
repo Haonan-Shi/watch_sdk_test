@@ -1,0 +1,13 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "Realtek Common Module Local Audio"
+config REALTEK_COMMON_MODULE_LOCAL_AUDIO
+    bool "Enable Realtek Common Module Local Audio"
+    default n
+    help
+        Realtek common module local audio support.
+endmenu

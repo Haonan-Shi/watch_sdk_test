@@ -1,0 +1,42 @@
+manifest:
+  version: '1.2'
+  remotes:
+  - name: fork
+    url-base: https://github.com/Haonan-Shi
+  defaults:
+    remote: fork
+  projects:
+  - name: zephyr
+    repo-path: zephyr
+    revision: f679f9593e16224cb56faed71379a61ebd0e5e8c
+    path: zephyr
+    west-commands: scripts/west-commands.yml
+    import:
+      file: test.yml
+      path-prefix: zephyrproject
+      name-allowlist:
+      - cmsis
+      - tinycrypt
+      - mbedtls
+      - fatfs
+  - name: honeygui
+    repo-path: HoneyGUI
+    revision: 759a35d98925907d788c8fe2ca7cc176099bc9f2
+    path: zephyrproject/modules/honeygui
+  - name: lvgl
+    repo-path: lvgl
+    revision: fe1fd1fc5c3093d42e775a83f27bfadae09fa290
+    path: zephyrproject/modules/lvgl
+  - name: hal_realtek
+    repo-path: zephyr-hal
+    revision: 08447404c7b6237ee80b44c1d0a99460c4a20027
+    path: zephyrproject/modules/hal/realtek
+  - name: display
+    repo-path: display
+    revision: aae4606ca8312d6c2accef5277d71e7c68d4940f
+    path: zephyrproject/modules/display
+  self:
+    path: zephyrproject/realtek-app
+    userdata:
+      product: common
+      version: v1.0.0.16
