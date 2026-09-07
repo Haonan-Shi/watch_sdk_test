@@ -35,8 +35,9 @@
 		#address-cells = <1>;
 		#size-cells = <1>;
 		psram0_for_mcu: memory@22000000{
-			device_type = "psram 0 region";
+			compatible = "zephyr,memory-region";
 			reg = <0x22000000 DT_SIZE_K(4096)>;
+			zephyr,memory-region = "PSRAM0_MCU";
 		};
 	};
 
@@ -54,8 +55,9 @@
 		};
 		*/
 		psram1_for_mcu: memory@24000000{
-			device_type = "psram 1 region";
+			compatible = "zephyr,memory-region";
 			reg = <0x24000000 DT_SIZE_K(4096)>;
+			zephyr,memory-region = "PSRAM1_MCU";
 		};
 	};
 };

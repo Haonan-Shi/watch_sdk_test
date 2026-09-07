@@ -1,0 +1,20 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+description: |
+    This binding provides resources required to m2s and s2m for SPI.
+
+compatible: "spi_m2s2m-gpio"
+
+properties:
+  m2s-gpios:
+    type: phandle-array
+    required: true
+    description: M2S GPIO
+  s2m-gpios:
+    type: phandle-array
+    required: true
+    description: S2M GPIO

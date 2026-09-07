@@ -117,8 +117,9 @@
 		};
 		*/
 		psram1_for_mcu: memory@24000000{
-			device_type = "psram 1 region";
+			compatible = "zephyr,memory-region";
 			reg = <0x24000000 DT_SIZE_K(4096)>;
+			zephyr,memory-region = "PSRAM1_MCU";
 		};
 	};
 
@@ -185,7 +186,7 @@
 			};
 			flash_ftl_region: partition@1300000 {
 				label = "realtek-flash-ftl-region";
-				reg = <0x1300000 DT_SIZE_K(108544)>;
+				reg = <0x1300000 DT_SIZE_K(99328)>;
 				flash_nftl: flash_nftl{
 					compatible = "realtek,nftl";
 					size = <DT_SIZE_K(32)>;

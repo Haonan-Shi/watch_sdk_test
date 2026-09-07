@@ -44,7 +44,7 @@ static void aci_uart_async_init(void)
 static void aci_uart_async_console_callback(const struct device *dev,
                                             struct uart_event *evt, void *user_data)
 {
-    APP_PRINT_TRACE1("aci_uart_async_console_callback: type %d", evt->type);
+    // APP_PRINT_TRACE1("aci_uart_async_console_callback: type %d", evt->type);  // noisy: per-event, floods every DLPS cycle
 
     switch (evt->type)
     {

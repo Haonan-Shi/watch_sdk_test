@@ -1,0 +1,42 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+menu "WiFi-8711 (AT-over-SPI) transport module"
+
+config WIFI_8711
+	bool "Enable the WiFi-8711 AT-over-SPI transport module"
+	default n
+	select RING_BUFFER
+	help
+	  Compile the bt_audio_trx SPI transport module (src/wifi_8711)
+	  that talks to the external RTL8711 WiFi chip over SPI. Replaces the
+	  former app_flags.h F_APP_SPI_ROLE_* / F_APP_WIFI_SPI_CMD gating.
+	  Pull it in via the wifi_8711 snippet or a per-variant board overlay
+	  (record_pen / transceiver). RING_BUFFER (the SPI master TX cache) is
+	  the module's own dependency and is selected here. The shared SPI stack
+	  (SPI / SPI_SLAVE / SPI_ASYNC / SPI_RTL87X3G_DMA) lives in prj.conf
+	  because other features use SPI too.
+
+if WIFI_8711
+
+config WIFI_8711_ROLE_MASTER
+	bool "SPI master role (drive the 8711 slave)"
+	default y
+	help
+	  Compile the SPI master transport (app_spi_master_zephyr.c). This is
+	  the common case: the RTL87x3G is the SPI master toward the 8711.
+
+config WIFI_8711_CMD
+	bool "AT-command / TCP-TP command path"
+	default n
+	help
+	  Compile the AT-command and TCP throughput test path
+	  (app_spi_atcmd.c, spi_tcp_tp_test.c, app_spi_sd_source.c) and enlarge
+	  SPI_XMIT_SIZE to 16K for bulk transfers.
+
+endif # WIFI_8711
+
+endmenu

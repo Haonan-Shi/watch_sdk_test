@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
  */
 
+
+
 #if CONFIG_REALTEK_APP_AI_RECORD
 
 #include <string.h>
@@ -32,7 +34,9 @@
 #include "ai_record.h"
 #include "app_ai_record.h"
 #include "app_ai_record_process.h"
-
+#include "app_ai_record_service.h"
+#include "app_ai_record_file_trans.h"
+#include "app_flags.h"
 #if APP_AI_RECORD_PTA_SUPPORT
 #include <gap_vendor.h>
 #endif
@@ -48,11 +52,15 @@
 #include "app_ai_record_rtc.h"
 #include "app_sniff_mode_cs.h"
 
-#if F_APP_WIFI_SPI_CMD
+#if defined(CONFIG_WIFI_8711_CMD) && !F_APP_WIFI_UART_CMD
 #include "app_spi_atcmd.h"
 #endif
 #if F_APP_WIFI_UART_CMD
 #include "app_uart_atcmd.h"
+#endif
+
+#if (F_APP_WIFI_UART_CMD || F_APP_WIFI_SPI_CMD)
+#include "wifi_transport.h"
 #endif
 
 #define AI_RECORD_WIFI_MODE_IDLE            0
@@ -454,9 +462,16 @@ static void app_ai_record_cb_wifi_power_on(void)
     APP_PRINT_TRACE0("app_ai_record_cb_wifi_power_on");
     Pad_Config(PIN_WIFI_POWER,
                PAD_SW_MODE, PAD_IS_PWRON, PAD_PULL_DOWN, PAD_OUT_ENABLE, PAD_OUT_HIGH);
-    Pad_Config(PIN_G_SENSOR_POWER,
-               PAD_SW_MODE, PAD_IS_PWRON, PAD_PULL_DOWN, PAD_OUT_ENABLE, PAD_OUT_HIGH);
+    /* PIN_G_SENSOR_POWER (P5_4) is shared with UART3_TX (wifi AT uart); driving it
+     * as a GPIO corrupts the module's UART RX. G-sensor unused for now -> disabled. */
+    // Pad_Config(PIN_G_SENSOR_POWER,
+    //            PAD_SW_MODE, PAD_IS_PWRON, PAD_PULL_DOWN, PAD_OUT_ENABLE, PAD_OUT_HIGH);
     app_transfer_queue_reset(CMD_PATH_UART);
+}
+
+void app_ai_record_wifi_power_on(void)
+{
+    app_ai_record_cb_wifi_power_on();
 }
 
 static void app_ai_record_cb_wifi_power_down(bool disable_pin)
@@ -467,8 +482,9 @@ static void app_ai_record_cb_wifi_power_down(bool disable_pin)
     {
         Pad_Config(PIN_WIFI_POWER,
                    PAD_SW_MODE, PAD_IS_PWRON, PAD_PULL_DOWN, PAD_OUT_ENABLE, PAD_OUT_LOW);
-        Pad_Config(PIN_G_SENSOR_POWER,
-                   PAD_SW_MODE, PAD_IS_PWRON, PAD_PULL_DOWN, PAD_OUT_ENABLE, PAD_OUT_LOW);
+        /* PIN_G_SENSOR_POWER (P5_4) == UART3_TX; leave it to uart3 (G-sensor unused). */
+        // Pad_Config(PIN_G_SENSOR_POWER,
+        //            PAD_SW_MODE, PAD_IS_PWRON, PAD_PULL_DOWN, PAD_OUT_ENABLE, PAD_OUT_LOW);
     }
 }
 
@@ -487,7 +503,7 @@ static void app_ai_record_cb_report_send(uint8_t cmd_path, uint16_t event_id, ui
     app_report_event(cmd_path, event_id, app_index, data, len);
 }
 
-#if (F_APP_WIFI_SPI_CMD || F_APP_WIFI_UART_CMD)
+#if (defined(CONFIG_WIFI_8711_CMD) || F_APP_WIFI_UART_CMD)
 static void app_ai_record_cb_atcmd_send(uint16_t event_id, uint8_t *data, uint16_t len)
 {
     APP_PRINT_TRACE2("ai_record_tx_to_wifi===>, cmd_id 0x%04x, len 0x%x", event_id, len);
@@ -497,7 +513,7 @@ static void app_ai_record_cb_atcmd_send(uint16_t event_id, uint8_t *data, uint16
         {
             if (data[0] == AI_RECORD_WIFI_MODE_IDLE)
             {
-#if F_APP_WIFI_SPI_CMD
+#if defined(CONFIG_WIFI_8711_CMD) && !F_APP_WIFI_UART_CMD
                 app_spi_atcmd_queue_fill(ATCMD_WLDISCONN, "\r\n");
                 app_spi_atcmd_trigger_send_flow();
 #elif F_APP_WIFI_UART_CMD
@@ -519,8 +535,14 @@ static void app_ai_record_cb_atcmd_send(uint16_t event_id, uint8_t *data, uint16
                     uint8_t resv2[5];         // Reserved
                 } __attribute__((packed)) *pkt = (__typeof__(pkt))&data[1];
 
-                if (pkt->ssid_len > 32) { break; }
-                if (pkt->pwd_len > 64) { break; }
+                if (pkt->ssid_len > 32)
+                {
+                    break;
+                }
+                if (pkt->pwd_len > 64)
+                {
+                    break;
+                }
                 char ssid_str[33] = {0};
                 char pwd_str[65] = {0};
                 memcpy(ssid_str, pkt->ssid, pkt->ssid_len);
@@ -530,7 +552,7 @@ static void app_ai_record_cb_atcmd_send(uint16_t event_id, uint8_t *data, uint16
 
                 char cmd_buffer[128] = {0};
 
-#if F_APP_WIFI_SPI_CMD
+#if defined(CONFIG_WIFI_8711_CMD) && !F_APP_WIFI_UART_CMD
                 snprintf(cmd_buffer, sizeof(cmd_buffer), "ssid,%s,pw,%s\r\n", ssid_str, pwd_str);
                 app_spi_atcmd_queue_fill(ATCMD_WLCONN, cmd_buffer);
                 app_spi_atcmd_trigger_send_flow();
@@ -708,6 +730,13 @@ static void app_ai_record_dfu_start_sys_upgrade(uint8_t *ota_info, uint8_t lengt
 }
 #endif
 
+
+
+#if (F_APP_WIFI_UART_CMD || F_APP_WIFI_SPI_CMD)
+
+/* Uses T_AT_EVT_TYPE from the WiFi AT header (app_spi_atcmd.h / app_uart_atcmd.h),
+ * which is only included when a WiFi transport is enabled, and is only registered
+ * in that same case below. Guard the definition so no-transport builds compile. */
 static void app_ai_record_wifi_atevt_handle(T_AT_EVT_TYPE evt, void *p_data, uint16_t len)
 {
     ai_cmd_wifi_atevt_handle(evt, (uint8_t *)p_data, len);
@@ -720,13 +749,8 @@ void app_ai_record_cb_init(void)
     //ai_record_register_cb(AI_RECORD_CB_IDX_WIFI_POWER_DOWN_HANDLE, (AI_RECORD_FUNC_CB)app_ai_record_cb_wifi_power_down);
     ai_record_register_cb(AI_RECORD_CB_IDX_REPORT_SEND,
                           (AI_RECORD_FUNC_CB)app_ai_record_cb_report_send);
-#if F_APP_WIFI_SPI_CMD
-    app_spi_atcmd_register_callback(app_ai_record_wifi_atevt_handle);
+    wifi_transport_register_callback((wifi_at_evt_cb_t)app_ai_record_wifi_atevt_handle);
     ai_record_register_cb(AI_RECORD_CB_IDX_ATCMD_SEND, (AI_RECORD_FUNC_CB)app_ai_record_cb_atcmd_send);
-#elif F_APP_WIFI_UART_CMD
-    app_uart_atcmd_register_callback(app_ai_record_wifi_atevt_handle);
-    ai_record_register_cb(AI_RECORD_CB_IDX_ATCMD_SEND, (AI_RECORD_FUNC_CB)app_ai_record_cb_atcmd_send);
-#endif
     ai_record_register_cb(AI_RECORD_CB_IDX_AI_RECORDING_START, app_ai_record_cb_ai_record_start);
     ai_record_register_cb(AI_RECORD_CB_IDX_AI_RECORDING_STOP, app_ai_record_cb_ai_record_stop);
 
@@ -745,6 +769,8 @@ void app_ai_record_cb_init(void)
 #endif
 }
 
+#endif /* F_APP_WIFI_UART_CMD || F_APP_WIFI_SPI_CMD */
+
 static void app_ai_record_set_side_role(void)
 {
     uint8_t side_role = AI_RECORD_SIDE_ROLE_SINGLE;
@@ -755,6 +781,59 @@ static void app_ai_record_set_side_role(void)
     }
 
     ai_record_side_role_set(side_role);
+}
+
+/**
+ * @brief Central dispatcher for record-trans service events.
+ *
+ *  This is the single entry point all upstream events from the GATT
+ *  layer flow through. It owns the routing policy: today every WRITE
+ *  goes to file_trans (the only consumer); future modules can branch
+ *  here on cmd_id without touching service.c.
+ *
+ *  WRITE event:
+ *    p_data->msg_data.write.{p_value, length} carries the raw payload.
+ *    Pointer is valid only within this call - file_trans copies what
+ *    it needs internally before returning.
+ *
+ *  CCCD_UPDATE event:
+ *    p_data->msg_data.notification_index identifies which notify char
+ *    the CCCD belongs to (record-trans only has one).
+ */
+static T_APP_RESULT app_ai_record_service_cb(uint8_t type, void *p_data)
+{
+    if (p_data == NULL)
+    {
+        return APP_RESULT_APP_ERR;
+    }
+
+    T_RECORD_TRANS_CALLBACK_DATA *d = (T_RECORD_TRANS_CALLBACK_DATA *)p_data;
+
+    switch (type)
+    {
+    case GATT_MSG_RECORD_TRANS_SERVER_WRITE:
+        /* Forward raw payload + link info to file_trans. Future hook:
+         * peek at cmd_id (d->msg_data.write.p_value[0..1]) here to
+         * route different cmd_id ranges to different modules. */
+        return app_ai_record_file_handle_cp_req(d->conn_id, d->conn_handle,
+                                                d->cid, d->chann_type,
+                                                d->msg_data.write.length,
+                                                d->msg_data.write.p_value);
+
+    case GATT_MSG_RECORD_TRANS_SERVER_CCCD_UPDATE:
+        /* Service-layer log already prints whether notify is enabled;
+         * we just propagate the link info. The `true` here mirrors the
+         * historical assumption - refine to the actual cccd_bits if we
+         * ever add a real notify_enabled field to the union. */
+        app_ai_record_file_trans_on_cccd(d->conn_id, d->conn_handle,
+                                         d->cid, d->chann_type,
+                                         true);
+        return APP_RESULT_SUCCESS;
+
+    default:
+        APP_PRINT_WARN1("app_ai_record_service_cb: unknown type 0x%02x", type);
+        return APP_RESULT_APP_ERR;
+    }
 }
 
 void app_ai_record_init(void)
@@ -770,9 +849,11 @@ void app_ai_record_init(void)
 
     app_ai_record_set_side_role();
 
-    app_ai_record_cb_wifi_power_down(true);
+    // app_ai_record_cb_wifi_power_down(true);
 
+#if (F_APP_WIFI_UART_CMD || F_APP_WIFI_SPI_CMD)
     app_ai_record_cb_init();
+#endif
 #if F_APP_DFU
     //ota
     app_dfu_cback_register(ai_record_dfu_fail_handle, DFU_ERROR);
@@ -786,6 +867,15 @@ void app_ai_record_init(void)
     app_ai_record_rtc_calendar_init();
 #endif
 
+    /* BLE file-transfer service: register GATT service, then init the
+     * application-layer state machine. SDP record (BR/EDR over GATT)
+     * needs the GATT handle range to already be assigned, so it goes
+     * after record_trans_reg_srv(). */
+    app_ai_record_file_trans_init();
+    record_trans_reg_srv(app_ai_record_service_cb);
+#if CONFIG_RECORD_TRANS_GATT_OVER_BREDR
+    record_trans_sdp_register();
+#endif
 }
 
 #endif //F_APP_AI_AI_RECORD_SUPPORT

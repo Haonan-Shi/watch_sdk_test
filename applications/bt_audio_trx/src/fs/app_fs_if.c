@@ -399,14 +399,95 @@ int32_t app_fs_create_folder(const char *folder_name)
 
 int32_t app_fs_init(void)
 {
+    uint8_t status = FS_STATUS_MOUNT_OK;
+
     APP_PRINT_INFO1("AUDIO_FILE_PATH is %s", TRACE_STRING(AUDIO_FILE_PATH));
     if (fs_init(&mp_fatfs) != 0)
     {
         APP_PRINT_ERROR1("app fs mount disk error: disk root path %s", TRACE_STRING(mp_fatfs.mnt_point));
-
+#if F_APP_FS_FORMAT_SUPPORT
+        status = FS_STATUS_MOUNT_FAIL;
+        app_report_event(CMD_PATH_UART, EVENT_FS_MOUNT_STATUS, 0, &status, sizeof(status));
+#endif
         return -1;
     }
     audio_fs_mounted = true;
     app_fs_create_folder(AUDIO_FILE_PATH);
+#if F_APP_FS_FORMAT_SUPPORT
+    app_report_event(CMD_PATH_UART, EVENT_FS_MOUNT_STATUS, 0, &status, sizeof(status));
+#endif
     return 0;
 }
+
+#if F_APP_FS_FORMAT_SUPPORT
+int32_t app_fs_format(uint32_t opt)
+{
+    int res;
+    uint8_t status;
+    void *fs_buf = NULL;
+
+    /* allocate FATFS work area if not already present */
+    if (mp_fatfs.fs_data == NULL)
+    {
+        fs_buf = os_mem_alloc(OS_MEM_TYPE_DATA, sizeof(FATFS));
+        if (fs_buf == NULL)
+        {
+            status = FS_STATUS_FORMAT_FAIL;
+            app_report_event(CMD_PATH_UART, EVENT_FS_MOUNT_STATUS, 0, &status, sizeof(status));
+            return -1;
+        }
+        mp_fatfs.fs_data = fs_buf;
+    }
+
+    MKFS_PARM mkfs_parm =
+    {
+        .fmt     = (uint8_t)opt,
+        .n_fat   = 1,
+        .align   = 0,
+        .n_root  = 0,
+        .au_size = 0,
+    };
+
+    res = fs_mkfs(mp_fatfs.type, (uintptr_t)mp_fatfs.mnt_point, &mkfs_parm, 0);
+    if (res != 0)
+    {
+        APP_PRINT_ERROR2("app_fs_format: mkfs fail, opt=0x%x res=%d", opt, res);
+        os_mem_free(mp_fatfs.fs_data);
+        mp_fatfs.fs_data = NULL;
+        audio_fs_mounted = false;
+        status = FS_STATUS_FORMAT_FAIL;
+        app_report_event(CMD_PATH_UART, EVENT_FS_MOUNT_STATUS, 0, &status, sizeof(status));
+        return -2;
+    }
+
+    fs_deinit(&mp_fatfs);
+
+    mp_fatfs.fs_data = os_mem_alloc(OS_MEM_TYPE_DATA, sizeof(FATFS));
+    if (mp_fatfs.fs_data == NULL)
+    {
+        status = FS_STATUS_FORMAT_FAIL;
+        app_report_event(CMD_PATH_UART, EVENT_FS_MOUNT_STATUS, 0, &status, sizeof(status));
+        return -3;
+    }
+
+    res = fs_init(&mp_fatfs);
+    if (res != 0)
+    {
+        APP_PRINT_ERROR2("app_fs_format: mount after format failed, opt=0x%x res=%d", opt, res);
+        os_mem_free(mp_fatfs.fs_data);
+        mp_fatfs.fs_data = NULL;
+        audio_fs_mounted = false;
+        status = FS_STATUS_FORMAT_FAIL;
+        app_report_event(CMD_PATH_UART, EVENT_FS_MOUNT_STATUS, 0, &status, sizeof(status));
+        return -4;
+    }
+
+    audio_fs_mounted = true;
+    app_fs_create_folder(AUDIO_FILE_PATH);
+    APP_PRINT_INFO0("app_fs_format: format and mount ok");
+
+    status = FS_STATUS_FORMAT_OK;
+    app_report_event(CMD_PATH_UART, EVENT_FS_MOUNT_STATUS, 0, &status, sizeof(status));
+    return 0;
+}
+#endif

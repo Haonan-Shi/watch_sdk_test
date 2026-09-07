@@ -26,10 +26,6 @@
 #include "app_qdec.h"
 #endif
 
-#if (F_APP_SPI_ROLE_MASTER || F_APP_SPI_ROLE_SLAVE)
-#include "app_spi_common.h"
-#endif
-
 #if F_APP_A2DP_XMIT_SRC_LEA_SUPPORT
 #include "app_a2dp_xmit_lea.h"
 #endif
@@ -63,6 +59,14 @@
 
 #if F_APP_WIFI_UART_CMD
 #include "app_wifi_uart.h"
+#endif
+
+#if CONFIG_REALTEK_APP_AI_AUTH
+#include "app_rtk_auth.h"
+#endif
+
+#if (F_APP_SPI_ROLE_MASTER || F_APP_SPI_ROLE_SLAVE)
+#include "app_spi_common.h"
 #endif
 
 RAM_TEXT_SECTION bool app_io_msg_send(T_IO_MSG *io_msg)
@@ -232,7 +236,16 @@ void app_io_msg_handler(T_IO_MSG io_driver_msg_recv)
 #if (F_APP_SPI_ROLE_MASTER || F_APP_SPI_ROLE_SLAVE)
     case IO_MSG_TYPE_AUDIO_TRANS_SPI:
         {
+#if defined(CONFIG_WIFI_8711)
+            /* record pen SPI/WiFi build: wifi_8711 module owns the SPI transport
+             * and app_spi_msg_handle() takes (subtype, buf) -- see
+             * src/wifi_8711/app_spi_common.h */
+            app_spi_msg_handle(io_driver_msg_recv.subtype, io_driver_msg_recv.u.buf);
+#else
+            /* transceiver SPI build: app_spi_msg_handle() takes the whole T_IO_MSG
+             * -- see src/spi/app_spi_common.h */
             app_spi_msg_handle(io_driver_msg_recv);
+#endif
         }
         break;
 #endif

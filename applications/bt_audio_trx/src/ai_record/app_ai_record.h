@@ -115,6 +115,12 @@ void app_ai_record_a2dp_check_resume(void);
 
 void app_ai_record_set_mode_cmd_handle(bool fast_mode);
 
+/** @brief Drive the external WiFi module's chip_en (and G-sensor) power pins
+ *  high. Same pin logic as the CMD_AI_RECORD_WIFI_POWER_ON path; safe to call
+ *  repeatedly. Callers that talk to a cold module must allow it boot time
+ *  before issuing commands. */
+void app_ai_record_wifi_power_on(void);
+
 void app_ai_record_init(void);
 
 #ifdef __cplusplus

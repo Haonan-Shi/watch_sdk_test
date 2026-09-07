@@ -119,6 +119,10 @@
 	status = "okay";
 };
 
+&gpiob {
+	status = "okay";
+};
+
 &rtc {
     status = "disabled";
 	channels = <1>;
@@ -148,6 +152,23 @@
 	};
 };
 
+&timer6 {
+	status = "okay";
+	prescaler = <1>;
+	pwm6: pwm6 {
+		status = "okay";
+		pinctrl-0 = <&pwm6_default>;
+		pinctrl-names = "default";
+	};
+};
+
+&pinctrl {
+	pwm6_default: pwm6_default {
+		group1 {
+			psels = <RTL87X3G_PSEL(PWM6_P, P5_1, DIR_OUT, DRV_LOW, PULL_DOWN)>;
+		};
+	};
+};
 
 /*delete-node only support nodes with lable */
 /delete-node/ &dtcm;
@@ -159,7 +180,6 @@
 /delete-node/ &dsp_share_ram;
 /delete-node/ &timer4;
 /delete-node/ &timer5;
-/delete-node/ &timer6;
 /delete-node/ &timer7;
 /delete-node/ &timer8;
 
@@ -231,6 +251,8 @@
 		};
 	};
 
+	};
+	
 	itcm {
 		itcm: memory@c0c00 {
 			device_type = "itcm region";

@@ -1,0 +1,5 @@
+board:
+  name: rtl87x3g_sample
+  vendor: realtek
+  socs:
+  - name: rtl8773gtp

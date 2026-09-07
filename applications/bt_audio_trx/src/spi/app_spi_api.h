@@ -14,11 +14,7 @@ extern "C" {
 #include "string.h"
 #include "rtl876x.h"
 #include "btm.h"
-#if F_APP_WIFI_SPI_CMD
-#define SPI_XMIT_SIZE                   704
-#else
-#define SPI_XMIT_SIZE                   704
-#endif
+#define SPI_XMIT_SIZE                   2048
 #define SPI_CMD_SYNC_INVALID            0xFF
 
 typedef enum

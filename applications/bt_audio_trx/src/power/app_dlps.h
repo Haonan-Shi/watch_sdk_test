@@ -47,6 +47,7 @@ extern "C" {
 #define APP_DLPS_ENTER_CHECK_XMIT               0x00020000
 #define APP_DLPS_ENTER_CHECK_INIT               0x00040000
 #define APP_DLPS_ENTER_CHECK_SD_CARD            0x00080000
+#define APP_DLPS_ENTER_CHECK_PWM                0x00100000
 /** End of APP_DLPS_Exported_Macros
     * @}
     */

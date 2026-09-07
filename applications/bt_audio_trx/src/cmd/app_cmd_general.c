@@ -335,8 +335,8 @@ static void app_cmd_get_fw_version(uint8_t *p_data)
     temp_buff[2] = p_app_header->git_ver.sub_version._version_revision;
 
     // currently 5 bits, must be 0
-    temp_buff[3] = 0; // p_app_header->git_ver.sub_version._version_reserve >> 8;
-    temp_buff[4] = p_app_header->git_ver.sub_version._version_reserve;
+    temp_buff[3] = p_app_header->git_ver.sub_version._version_reserve & 0xFF;
+    temp_buff[4] = p_app_header->git_ver.sub_version._version_reserve >> 8;
 
     temp_buff[5] = p_patch_img_ver->ver_major;
     temp_buff[6] = p_patch_img_ver->ver_minor;

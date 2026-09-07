@@ -1,0 +1,66 @@
+{
+  "mptoolconfig": {
+    "port": "COM1",
+    "baud": "1000000",
+    "images": {
+      "file": [
+        {
+          "address": "0x70002000",
+          "path": "./image/rcfg/For EVB/SYSTEM_Config_RTL8773G_16M-e5396aef5fb9a2f4cd5dd187f87ef51f.bin"
+        },
+        {
+          "address": "0x70004000",
+          "path": "./image/BANK0/boot_patch0_MP-v1.0.46.c21101ef-fd781163c5e4e49e20c5ec59032c6b5f.bin"
+        },
+        {
+          "address": "0x70007000",
+          "path": "./image/BANK0/boot_patch1_MP-v1.0.46.c21101ef-a3ad0f2780e9b172bf93549df9daac1f.bin"
+        },
+        {
+          "address": "0x7000A000",
+          "path": "./image/BANK0/upperstack_MP-v0.0.6.4d251c71-16e984c1d7e5197ac9e4e7ca1590b045.bin"
+        },
+        {
+          "address": "0x70049000",
+          "path": "./image/BANK0/OTAHeader_Bank0_v0.0.0.1-af985f3a979d529ca8b06d2d957f33b4.bin"
+        },
+        {
+          "address": "0x7004A000",
+          "path": "./image/BANK0/stack_patch_bank0_MP-v0.0.113.d02f8849-f8f8b5651eb0a83324c6e010654b6638.bin"
+        },
+        {
+          "address": "0x7007C000",
+          "path": "./image/BANK0/sys_patch_bank0_MP-v1.0.46.c21101ef-d60b334bfddf415ca3da5973a123cdce.bin"
+        },
+        {
+          "address": "0x7009E000",
+          "path": "./image/BANK0/bt_audio_receiver_bank0_MP-v3.14.7.1858-934b29aa-9255043d3de936d25f5e8f9e1adae8cd.bin"
+        },
+        {
+          "address": "0x70207000",
+          "path": "./image/BANK0/dsp_sys_image_8773G_V3.0.5.80_SHA-0fdeb4f890df_MP-0c62dbdc830ac32681dd1e20e92eff1c.bin"
+        },
+        {
+          "address": "0x70261000",
+          "path": "./image/BANK0/dsp_app_image_8773G_V3.0.5.80_SHA-0fdeb4f890df_MP-b04b72d239c98b3f74badc3c2c566c4b.bin"
+        },
+        {
+          "address": "0x70292000",
+          "path": "./image/BANK0/dsp_config_image-3.140.62.7-26685-V1.8A1.2-RTL8773GTP-b2c8e31f27d983377bd7c1d5cb676c94.bin"
+        },
+        {
+          "address": "0x7029C000",
+          "path": "./image/rcfg/For EVB/APP_Config_RTL8773G_16M-c13f179ca77acabefd401562db7a4048.bin"
+        },
+        {
+          "address": "0x70536000",
+          "path": "./image/BANK0/root_MP-c2f76d73c25c4a5d5cd2238b52b51bec.bin"
+        },
+        {
+          "address": "0x704F3000",
+          "path": "./image/rcfg/For EVB/VPData_RTL8773G_16M-60cdf14b6b0914e31cd90e2914edc445.bin"
+        }
+      ]
+    }
+  }
+}

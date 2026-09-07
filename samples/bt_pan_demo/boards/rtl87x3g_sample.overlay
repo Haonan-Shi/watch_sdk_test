@@ -1,0 +1,146 @@
+/*
+ * Copyright(c) 2024, Realtek Semiconductor Corporation.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <zephyr/dt-bindings/gpio/realtek-rtl87x3g-gpio.h>
+#include <zephyr/dt-bindings/pinctrl/rtl87x3g-pinctrl.h>
+
+/ {
+    chosen {
+        /* Route the RTK console transport onto uart3 through the Zephyr async
+         * UART driver. Change this phandle to move the console to any UART. */
+        realtek,console-uart = &uart3;
+    };
+};
+
+&uart3 {
+    pinctrl-0 = <&uart3_default>;
+    pinctrl-1 = <&uart3_sleep>;
+    pinctrl-names = "default", "sleep";
+    status = "okay";
+    current-speed = <115200>;
+    parity = "none";
+    stop-bits = "1";
+    data-bits = <8>;
+    dmas = <&dma0 2 49 0xa>, <&dma0 3 48 0x10021>;
+    dma-names = "rx", "tx";
+};
+ 
+&dma0 {
+    status = "okay";
+};
+ 
+&pinctrl
+{
+    uart3_default:uart3_default {
+        group1 {
+            psels = <RTL87X3G_PSEL(UART3_TX, P3_1, DIR_OUT, DRV_HIGH, PULL_UP)>,
+            <RTL87X3G_PSEL(UART3_RX, P3_0, DIR_IN, DRV_HIGH, PULL_UP)>;
+        };
+    };
+ 
+    uart3_sleep:uart3_sleep {
+        group1 {
+            psels = <RTL87X3G_PSEL(SW_MODE, P3_1, DIR_OUT, DRV_HIGH, PULL_UP)>;
+        };
+        group2 {
+            psels = <RTL87X3G_PSEL(SW_MODE, P3_0, DIR_IN, DRV_HIGH, PULL_UP)>;
+            wakeup-low;
+        };
+    };
+};
+
+/*delete-node only support nodes with lable */
+/delete-node/ &dtcm;
+/delete-node/ &heap_dtcm;
+/delete-node/ &sram;
+/delete-node/ &heap_sram;
+/delete-node/ &itcm;
+/delete-node/ &heap_itcm;
+/delete-node/ &dsp_share_ram;
+
+/ {
+	aliases {
+		qdec0 = &qdec;
+		dma-0 = &dma0;
+		rtc = &rtc;
+		sdhc0 = &sdhc0;
+		i2c-1 = &i2c1;
+    };
+
+
+	
+	/* DTCM addr: 0x20000000~0x20020000, total size: 128KByte.
+	 * The front 46Kbyte was taken by RTK internal.
+	 * If users wants to increase global variables and zephyr static heap,
+	 * please follow the steps:
+	 * 1. increase dtcm size value "reg = <0x2000B800 DT_SIZE_K(NEW_SIZE)>"
+	 * 2. modify heap_dtcm addr label "heap_dtcm: memory@NEW_ADDR"
+	 * 3. modify heap_dtcm reg addr "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * 4. decrease heap_dtcm size value "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * Warning: 
+	 * 1. the dtcm address should NOT modified!
+	 * 2. the dtcm plus heap_dtcm size should NOT exceed 82KByte!
+	 */
+	dtcm {
+		dtcm: memory@2000b800 {
+			device_type = "dtcm region";
+			reg = <0x2000B800 DT_SIZE_K(81)>;
+		};
+		heap_dtcm: memory@2001fc00 {
+			device_type = "heap dtcm region";
+			reg = <0x2001FC00 DT_SIZE_K(1)>;
+		};
+	};
+	/* sram addr: 0x20020000~0x20048000, total size: 160KByte.
+	 * call zephyr_code_relocate(FILES xxx.x LOCATION SRAM) at cmakelist could relocate variables on sram. 
+	 * for more information, please refer to https://docs.zephyrproject.org/latest/kernel/code-relocation.html
+	 * If users wants to increase sram size, please follow the steps:
+	 * 1. increase sram size value "reg = <0x20020000 DT_SIZE_K(NEW_SIZE)>"
+	 * 2. modify heap_sram addr label "heap_sram: memory@NEW_ADDR"
+	 * 3. modify heap_sram reg addr "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * 4. decrease heap_sram size value "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * Warning: 
+	 * 1. the sram address should NOT modified!
+	 * 2. the sram plus heap_sram size should NOT exceed 160KByte!
+	 */
+	sram {
+		sram: memory@20020000 {
+			device_type = "sram region";
+			compatible = "zephyr,memory-region", "mmio-sram";
+			reg = <0x20020000 DT_SIZE_K(70)>;
+			zephyr,memory-region = "SRAM";
+		};
+		heap_sram: memory@20031800 {
+			device_type = "heap sram region";
+			reg = <0x20031800 DT_SIZE_K(90)>;
+		};
+	};
+
+	itcm {
+		itcm: memory@c0c00 {
+			device_type = "itcm region";
+			compatible = "zephyr,memory-region", "arm,itcm";
+			zephyr,memory-region = "ITCM";
+			reg = <0xC0C00 DT_SIZE_K(29)>;
+		};
+		heap_itcm: memory@c8000 {
+			device_type = "heap itcm region";
+			reg = <0xC8000 DT_SIZE_K(64)>;
+		};
+	};
+
+/**
+	dsp_ram {
+		dsp_share_ram: memory@20048000 {
+			compatible = "zephyr,memory-region";
+			device_type = "dsp_share_ram region";
+			zephyr,memory-region = "DSPRAM";
+			reg = <0x20048000 DT_SIZE_K(80)>;
+		};
+	};
+*/	
+};
+

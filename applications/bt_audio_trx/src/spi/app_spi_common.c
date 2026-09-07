@@ -8,6 +8,7 @@
 #include "app_spi_common.h"
 #include "app_spi_api.h"
 #include "app_dlps.h"
+#include "app_io_msg.h"   /* bt_audio_trx port: app_io_msg_send() */
 #include "trace.h"
 
 static uint8_t app_spi_xmit_status_bitmask = 0;

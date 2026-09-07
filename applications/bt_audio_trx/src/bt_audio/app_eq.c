@@ -29,6 +29,10 @@
 #include "app_lea_acc_unicast_audio.h"
 #endif
 
+#if F_APP_CCP_SUPPORT
+#include "app_lea_acc_ccp.h"
+#endif
+
 #if F_APP_LINEIN_SUPPORT
 #include "app_line_in.h"
 #endif
@@ -1722,6 +1726,11 @@ static uint8_t app_eq_judge_mic_eq_mode(uint8_t stream_type)
 uint8_t app_eq_judge_audio_eq_mode(void)
 {
     uint8_t new_eq_mode = SPK_EQ_MODE_MAX;
+    bool is_voice = app_hfp_sco_is_connected();
+
+#if F_APP_CCP_SUPPORT
+    is_voice |= app_lea_ccp_get_active_conn_handle();
+#endif
 
 #if F_APP_ANC_SUPPORT
     bool is_anc_on = app_anc_is_anc_on_state(app_db.current_listening_state);
@@ -1741,7 +1750,7 @@ uint8_t app_eq_judge_audio_eq_mode(void)
     }
 #endif
 #if F_APP_VOICE_SPK_EQ_SUPPORT
-    else if (app_hfp_sco_is_connected() && (eq_utils_num_get(SPK_SW_EQ, VOICE_SPK_MODE) != 0))
+    else if (is_voice && (eq_utils_num_get(SPK_SW_EQ, VOICE_SPK_MODE) != 0))
     {
         new_eq_mode = VOICE_SPK_MODE;
     }

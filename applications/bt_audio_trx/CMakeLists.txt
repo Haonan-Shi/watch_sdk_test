@@ -62,6 +62,7 @@ set(directories
 	src/power
 	src/smart_pa
 	src/source_play
+    src/wifi_8711
     src/spi
 	src/test
 	src/throuput_server
@@ -121,7 +122,6 @@ set(headers
 	src/power
 	src/smart_pa
 	src/source_play
-    src/spi
 	src/test
 	src/throuput_server
 	src/transfer_path
@@ -167,7 +167,13 @@ foreach(src ${sources})
 endforeach()
 
 foreach(header ${headers})
-    if(EXISTS ${header})
+    # Resolve relative entries against the source dir; a bare relative path in
+    # if(EXISTS) is evaluated against the CMake process CWD, which is the build
+    # dir during ninja-triggered reconfigures -> flashmap (headers-only, no
+    # build-output mirror dir) would spuriously fail. ABSOLUTE BASE_DIR keeps
+    # already-absolute entries (e.g. ${ZEPHYR_REALTEK_APP_MODULE_DIR}/...) intact.
+    get_filename_component(header_abs "${header}" ABSOLUTE BASE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+    if(EXISTS ${header_abs})
         zephyr_include_directories(${header})
     else()
         message(FATAL_ERROR "header file directory does not exist: ${header}. Current cmakelist: ${CMAKE_CURRENT_SOURCE_DIR}")

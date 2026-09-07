@@ -33,6 +33,13 @@ extern "C" {
 #define PIN_SPI0_MOSI           P2_6
 #define PIN_SPI0_MISO           ADC_1
 
+/* High-speed SPI1 (spi1_hs) bus pads, hardware CS (SS_N). Used by the
+ * record_pen overlay; the SPI1 function is fixed to the P4_2..P4_5 pads. */
+#define PIN_SPI1_CLK            P4_2
+#define PIN_SPI1_MISO           P4_3
+#define PIN_SPI1_MOSI           P4_4
+#define PIN_SPI1_CSN            P4_5
+
 
 /* refer by device tree pinctrl*/
 #define UART0_TX_PIN            P3_1

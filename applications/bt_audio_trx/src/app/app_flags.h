@@ -7,6 +7,8 @@
 #ifndef _APP_FLAGS_H_
 #define _APP_FLAGS_H_
 
+#include <zephyr/devicetree.h>
+
 //Init value of default features are defined here
 //----- [Device related] -----
 #define F_APP_AUTO_POWER_TEST_LOG           0
@@ -178,6 +180,8 @@
 
 #define F_APP_USB_MSC_SUPPORT               1
 #define F_APP_DBG_DUMP_PCM_TO_FILE          0       /* Save decoded PCM to file during SD playback */
+#define F_APP_FS_FORMAT_SUPPORT             0
+#define F_APP_PWM_OUTPUT_SUPPORT            0
 
 #endif /* end of F_APP_BT_AUDIO_TRANSMITTER_DEMO_SUPPORT */
 
@@ -312,18 +316,51 @@
 #undef F_APP_DISABLE_NOTIFICATION_SUPPORT
 #define F_APP_DISABLE_NOTIFICATION_SUPPORT  1
 
-/* WiFi AT Command Path Config. Choose One of F_APP_WIFI_SPI_CMD or F_APP_WIFI_UART_CMD*/
-/* NOTE: Must match overlay's spi0 status to avoid resource waste */
-#undef F_APP_WIFI_SPI_CMD
-#define F_APP_WIFI_SPI_CMD                  0
-#if F_APP_WIFI_SPI_CMD
-#undef F_APP_SPI_ROLE_MASTER
-#define F_APP_SPI_ROLE_MASTER               1
-#endif
-/* NOTE: Must match overlay's uart3 status to avoid resource waste */
+/* WiFi AT Command Path Config. Choose at most one of the SPI or the UART path.
+ * UART path (8783GBF): used when the board has a wifi_int DT node (external
+ *   RTL8720C Wi-Fi module via UART+SDIO). Defines F_APP_WIFI_UART_CMD and
+ *   compiles src/ai_record/wifi/.
+ * SPI path (8773GTP): used when no wifi_int exists but a SPI controller does
+ *   (external Wi-Fi IC via SPI1_HS). Defines F_APP_WIFI_SPI_CMD and compiles
+ *   src/spi_8711/spi_file_upload.c.
+ * Both paths share the same upper-layer protocol (ai_record_lib + file_trans). */
+/* NOTE: Must match overlay's uart3 status to avoid resource waste.
+ * Derive it from the DT: the wifi-uart module needs the wifi_int node,
+ * which only exists on boards carrying the external UART Wi-Fi module
+ * (e.g. rtl8783gbf). Boards without it (e.g. rtl8773gtp record_pen,
+ * which is SPI-only) skip src/ai_record/wifi/ in CMake, so the wifi-uart
+ * call sites must compile out too, otherwise they reference symbols that
+ * were never built. This mirrors the add_subdirectory(wifi) gate in
+ * src/ai_record/CMakeLists.txt. */
 #undef F_APP_WIFI_UART_CMD
+#if DT_NODE_EXISTS(DT_NODELABEL(wifi_int))
 #define F_APP_WIFI_UART_CMD                 1
+#else
+#define F_APP_WIFI_UART_CMD                 0
+#endif
 
+
+/* Auto-detect SPI Wi-Fi transport: when no wifi_int DT node exists but
+ * a SPI controller does, enable the SPI AT-cmd + file upload path. */
+#undef F_APP_WIFI_SPI_CMD
+#if !DT_NODE_EXISTS(DT_NODELABEL(wifi_int)) && \
+    (DT_NODE_EXISTS(DT_NODELABEL(spi0_device)) || \
+     DT_NODE_EXISTS(DT_NODELABEL(spi1_hs)))
+#define F_APP_WIFI_SPI_CMD  1
+#else
+#define F_APP_WIFI_SPI_CMD  0
+#endif
+
+#if F_APP_WIFI_SPI_CMD && !defined(CONFIG_WIFI_8711)
+#undef F_APP_SPI_ROLE_MASTER
+#define F_APP_SPI_ROLE_MASTER  1
+#endif
+
+
+#if F_APP_WIFI_UART_CMD
+#undef F_APP_WIFI_RTL8720C
+#define F_APP_WIFI_RTL8720C               1
+#endif
 
 #undef F_APP_WIFI_PTA_SUPPORT
 #define F_APP_WIFI_PTA_SUPPORT              0
@@ -376,8 +413,8 @@
 #undef F_APP_IAP_SUPPORT
 #define F_APP_IAP_SUPPORT                   0
 
-#define CONFIG_REALTEK_APP_AI_RECORD        1
-#define CONFIG_REALTEK_APP_AI_AUTH          1
+/* CONFIG_REALTEK_APP_AI_RECORD and CONFIG_REALTEK_APP_AI_AUTH are now
+ * managed by Kconfig (Kconfig + prj.conf) instead of app_flags.h. */
 #define CONFIG_REALTEK_APP_RTC_CALENDAR_SUPPORT      1
 
 #endif /* end of F_APP_AI_RECORD_PEN_DEMO_SUPPORT */

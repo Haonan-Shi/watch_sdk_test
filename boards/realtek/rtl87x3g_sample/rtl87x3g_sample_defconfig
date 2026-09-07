@@ -1,0 +1,24 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+#DISASSEMBLY
+CONFIG_OUTPUT_DISASSEMBLY=y
+
+#compile and libc config
+CONFIG_NEWLIB_LIBC=y
+CONFIG_NEWLIB_LIBC_MIN_REQUIRED_HEAP_SIZE=0
+
+# Console Driver (Have to disabled UART_CONSOLE if use RTK log system to output zephyr log)
+# CONFIG_CONSOLE=y
+# CONFIG_UART_CONSOLE=y
+
+# UART Driver
+# CONFIG_SERIAL=y
+# CONFIG_UART_INTERRUPT_DRIVEN=y
+# CONFIG_UART_ASYNC_API=y
+
+# Enable HW stack protection
+CONFIG_HW_STACK_PROTECTION=y

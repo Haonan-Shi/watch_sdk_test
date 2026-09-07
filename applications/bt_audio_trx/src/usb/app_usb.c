@@ -55,6 +55,10 @@
 #include "app_tri_dongle_mgr.h"
 #endif
 
+#if F_APP_PWM_OUTPUT_SUPPORT
+#include "app_key_detect.h"
+#endif
+
 typedef enum
 {
     USB_EVT_PLUG,
@@ -242,6 +246,9 @@ static void app_usb_dm_evt_handle(uint8_t evt, uint32_t data)
     {
     case USB_EVT_PLUG:
         {
+#if F_APP_PWM_OUTPUT_SUPPORT
+            app_key_detect_host_connected();
+#endif
             app_usb_start();
         }
         break;
@@ -249,7 +256,9 @@ static void app_usb_dm_evt_handle(uint8_t evt, uint32_t data)
     case USB_EVT_UNPLUG:
         {
             app_usb_stop();
-
+#if F_APP_KEY_DETECT_SUPPORT
+            app_key_detect_host_disconnected();
+#endif
         }
         break;
 
@@ -288,6 +297,33 @@ static void app_usb_dm_evt_handle(uint8_t evt, uint32_t data)
                         app_tri_dongle_notify_usb_state_delay_info();
 #endif
                     }
+                }
+                break;
+
+            case USB_ATTACHED:
+                {
+#if F_APP_USB_MSC_SUPPORT
+                    extern int usb_ms_scsi_init(void);
+                    usb_ms_scsi_init();
+                    extern int usb_ms_disk_init(void);
+                    os_mem_peek_printf();
+
+                    usb_ms_disk_init();
+                    usb_msc_init();
+                    os_mem_peek_printf();
+#endif
+                }
+                break;
+
+            case USB_PDN:
+                {
+#if F_APP_USB_MSC_SUPPORT
+                    extern int usb_ms_scsi_deinit(void);
+                    usb_ms_scsi_deinit();
+                    extern int usb_ms_disk_deinit(void);
+                    usb_ms_disk_deinit();
+                    usb_msc_deinit();
+#endif
                 }
                 break;
 
@@ -330,6 +366,23 @@ T_USB_POWER_STATE app_usb_power_state(void)
 
 static void app_usb_adp_state_change_cb(T_ADP_PLUG_EVENT event, void *user_data)
 {
+#if F_APP_PWM_OUTPUT_SUPPORT
+    if (app_key_detect_get_host_status() == false)
+    {
+        if (event == ADP_EVENT_PLUG_IN)
+        {
+            app_usb_dev_trigger_evt(USB_EVT_PLUG, 0);
+        }
+        else if (event == ADP_EVENT_PLUG_OUT)
+        {
+            app_usb_dev_trigger_evt(USB_EVT_UNPLUG, 0);
+        }
+    }
+    else
+    {
+        APP_PRINT_WARN0("app_usb_adp_state_change_cb: ignore event, host status confirmed");
+    }
+#else
     if (event == ADP_EVENT_PLUG_IN)
     {
         app_usb_dev_trigger_evt(USB_EVT_PLUG, 0);
@@ -338,6 +391,7 @@ static void app_usb_adp_state_change_cb(T_ADP_PLUG_EVENT event, void *user_data)
     {
         app_usb_dev_trigger_evt(USB_EVT_UNPLUG, 0);
     }
+#endif
 }
 
 void app_usb_msg_handle(T_IO_MSG *msg)
@@ -426,14 +480,19 @@ void app_usb_init(void)
 #endif
 
 #if F_APP_USB_MSC_SUPPORT
-    extern int usb_ms_scsi_init(void);
-    usb_ms_scsi_init();
-    extern int usb_ms_disk_init(void);
-    usb_ms_disk_init();
-    usb_msc_init();
+    // extern int usb_ms_scsi_init(void);
+    // usb_ms_scsi_init();
+    // extern int usb_ms_disk_init(void);
+    // usb_ms_disk_init();
+    // usb_msc_init();
 #endif
 
-    if (adp_get_current_state(ADP_DETECT_5V) == ADP_STATE_IN)
+
+    if ((adp_get_current_state(ADP_DETECT_5V) == ADP_STATE_IN)
+#if F_APP_PWM_OUTPUT_SUPPORT
+        && (app_key_detect_get_host_status() == false)
+#endif
+       )
     {
         app_usb_dev_trigger_evt(USB_EVT_PLUG, 0);
     }

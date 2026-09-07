@@ -1,4 +1,3 @@
-
 /*
  * Copyright (c) 2026, Realtek Semiconductor Corporation
  *
@@ -14,15 +13,15 @@
 /* -------------------------------------------------------------------------
  * Stream parameters
  * -------------------------------------------------------------------------*/
-#define USBH_AUDIO_PREFERRED_RATE     48000
-#define USBH_AUDIO_PREFERRED_CH       2
-#define USBH_AUDIO_PREFERRED_BITS     16
-#define USBH_AUDIO_BUF_PROC_INTRVL    8
-
-// #define USBH_AUDIO_PREFERRED_RATE     192000
+// #define USBH_AUDIO_PREFERRED_RATE     48000
 // #define USBH_AUDIO_PREFERRED_CH       2
-// #define USBH_AUDIO_PREFERRED_BITS     24
+// #define USBH_AUDIO_PREFERRED_BITS     16
 // #define USBH_AUDIO_BUF_PROC_INTRVL    8
+
+#define USBH_AUDIO_PREFERRED_RATE     192000
+#define USBH_AUDIO_PREFERRED_CH       2
+#define USBH_AUDIO_PREFERRED_BITS     24
+#define USBH_AUDIO_BUF_PROC_INTRVL    16
 
 #define TEST_PATTERN_SINE       0
 #define TEST_PATTERN_RAMP       1
@@ -30,6 +29,12 @@
 #define TEST_PATTERN            TEST_PATTERN_SINE
 #endif
 static uint8_t g_test_pattern = TEST_PATTERN;
+
+static uint32_t g_preferred_rate     = USBH_AUDIO_PREFERRED_RATE;
+static uint8_t  g_preferred_ch       = USBH_AUDIO_PREFERRED_CH;
+static uint8_t  g_preferred_bits     = USBH_AUDIO_PREFERRED_BITS;
+static uint8_t  g_buf_proc_intrvl    = USBH_AUDIO_BUF_PROC_INTRVL;
+
 #define SINE_LUT_LEN  48
 static const int16_t g_sine_lut[SINE_LUT_LEN] =
 {
@@ -54,16 +59,31 @@ extern bool app_read_start;
 /* -------------------------------------------------------------------------
  * Runtime state
  * -------------------------------------------------------------------------*/
-static T_USBH_AUDIO_FORMAT g_active_fmt =
-{
-    .sample_freq    = USBH_AUDIO_PREFERRED_RATE,
-    .nr_channels    = USBH_AUDIO_PREFERRED_CH,
-    .bit_resolution = USBH_AUDIO_PREFERRED_BITS,
-    .subframe_size  = (USBH_AUDIO_PREFERRED_BITS + 7) / 8,
-};
+static T_USBH_AUDIO_FORMAT g_active_fmt;
 static bool     g_stream_started = false;
 static uint32_t g_sine_phase     = 0;
 static uint8_t  g_pkt_fill_val   = 0;
+
+static void audio_update_active_fmt(void)
+{
+    g_active_fmt.sample_freq    = g_preferred_rate;
+    g_active_fmt.nr_channels    = (uint8_t)g_preferred_ch;
+    g_active_fmt.bit_resolution = (uint8_t)g_preferred_bits;
+    g_active_fmt.subframe_size  = (uint8_t)((g_preferred_bits + 7) / 8);
+}
+
+void app_usbh_audio_set_param(uint32_t rate, uint32_t ch, uint32_t bits, uint32_t buf_intrvl)
+{
+    g_preferred_rate     = rate;
+    g_preferred_ch       = (uint8_t)ch;
+    g_preferred_bits     = (uint8_t)bits;
+    g_buf_proc_intrvl    = (uint8_t)buf_intrvl;
+    audio_update_active_fmt();
+
+    APP_PRINT_INFO4("app_usbh_audio_set_param: rate=%lu ch=%lu bits=%lu buf_intrvl=%lu",
+                    rate, ch, bits, buf_intrvl);
+}
+
 /* -------------------------------------------------------------------------
  * Internal helpers
  * -------------------------------------------------------------------------*/
@@ -96,7 +116,7 @@ static void fill_sine(uint8_t *buf, uint32_t nr_samples, uint8_t nr_ch,
     }
 }
 /* -------------------------------------------------------------------------
- * ISO stream callback — ISR context
+ * ISO stream callback
  * -------------------------------------------------------------------------*/
 static int audio_out_stream_cb(uint8_t dir, uint8_t *buf,
                                T_USBH_AUDIO_PKT_INFO *pkt_info,
@@ -110,53 +130,43 @@ static int audio_out_stream_cb(uint8_t dir, uint8_t *buf,
     uint32_t total_bytes = 0;
     uint32_t bytes_per_sample;
     uint32_t nr_samples;
-    for (i = 0; i < pkt_cnt; i++)
-    {
-        total_bytes += pkt_info[i].length;
-    }
-    bytes_per_sample = (uint32_t)g_active_fmt.nr_channels * g_active_fmt.subframe_size;
-    nr_samples = (bytes_per_sample > 0) ? (total_bytes / bytes_per_sample) : 0;
-    USB_PRINT_INFO5("audio_out_stream_cb0: pkt_cnt %d total_bytes %d nr_samples %d, buf %p, nr_channels %d\n",
-                    pkt_cnt, total_bytes, nr_samples, buf, g_active_fmt.nr_channels);
-    // fill_sine(buf, nr_samples, g_active_fmt.nr_channels,
-    //           g_active_fmt.subframe_size);
-
 #if F_APP_DBG_DUMP_PCM_TO_RINGBUF
     if (!app_src_play_sd_pipe_is_playing())
     {
         return;
     }
-    if (app_read_start)
+#endif
+    bytes_per_sample = (uint32_t)g_active_fmt.nr_channels * g_active_fmt.subframe_size;;
+    APP_PRINT_WARN1("uac_audio_out_complete_cb: bytes_per_sample %d", bytes_per_sample);
+
+    for (i = 0; i < pkt_cnt; i++)
     {
-        uint32_t data_cnt = ring_buffer_get_data_count(&pcm_drain_rb.ring_buf);
-        USB_PRINT_INFO1("audio_out_stream_cb1:count %d", data_cnt);
-        if (data_cnt >= total_bytes)
+        uint8_t *p = buf + pkt_info[i].offset;
+        uint32_t nr_samples =
+            (bytes_per_sample > 0) ? (pkt_info[i].length / bytes_per_sample) : 0;
+#if F_APP_DBG_DUMP_PCM_TO_RINGBUF
+        if (app_read_start)
         {
-            ring_buffer_read(&pcm_drain_rb.ring_buf, total_bytes, buf);
+            uint32_t data_cnt = ring_buffer_get_data_count(&pcm_drain_rb.ring_buf);
+            USB_PRINT_INFO2("audio_out_stream_cb1:count %d,pkt_info[i].length %d", data_cnt,
+                            pkt_info[i].length);
+            if (data_cnt >= pkt_info[i].length)
+            {
+                ring_buffer_read(&pcm_drain_rb.ring_buf, pkt_info[i].length, p);
+            }
+            else
+            {
+                memset(p, 0, pkt_info[i].length);
+            }
         }
         else
         {
-            memset(buf, 0, total_bytes);
+            APP_PRINT_WARN0("uac_audio_out_complete_cb: app_read_start is false, memset buf to 0");
+            memset(p, 0, pkt_info[i].length);
         }
-
-    }
-    else
-    {
-        APP_PRINT_WARN0("uac_audio_out_complete_cb: app_read_start is false, memset buf to 0");
-        memset(buf, 0, total_bytes);
-    }
 #endif
-    // }
-    // else
-    // {
-    //     for (i = 0; i < pkt_cnt; i++)
-    //     {
-    //         memset(buf + pkt_info[i].offset, g_pkt_fill_val, pkt_info[i].length);
-    //         g_pkt_fill_val++;
-    //     }
-    //     USB_PRINT_INFO2("audio_out_stream_cb: pkt_cnt %d next_fill_val %d",
-    //                     pkt_cnt, g_pkt_fill_val);
-    // }
+    }
+
     return 0;
 }
 /* -------------------------------------------------------------------------
@@ -172,7 +182,7 @@ static void audio_out_start_streaming(void)
     {
         g_pkt_fill_val = 0;
     }
-    if (usbh_audio_driver_stream_start(USBH_AUDIO_DIR_OUT, &g_active_fmt, USBH_AUDIO_BUF_PROC_INTRVL,
+    if (usbh_audio_driver_stream_start(USBH_AUDIO_DIR_OUT, &g_active_fmt, g_buf_proc_intrvl,
                                        audio_out_stream_cb, NULL) == 0)
     {
         g_stream_started = true;
@@ -225,5 +235,5 @@ void app_usbh_audio_init(void)
     usbh_mgr_init();
     usbh_audio_driver_init();
     usbh_mgr_cb_register(msk, app_usbh_audio_cb);
-    usbh_mgr_start();
+    audio_update_active_fmt();
 }

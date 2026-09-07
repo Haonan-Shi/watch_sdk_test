@@ -27,7 +27,20 @@ typedef enum
 #else  // AT_CMD_VER == 2
 typedef enum
 {
-    ATCMD_ATPN,         // Set Profile (ATPN=)
+    ATCMD_ATWS,         //0 WiFi Scan (ATWS)
+    ATCMD_ATW0,         //1 WiFi Set SSID (ATW0=)
+    ATCMD_ATW1,         //2 WiFi Set Password (ATW1=)
+    ATCMD_ATWC,         //3 WiFi Connect (ATWC)
+    ATCMD_ATWT,         //4 WiFi Test/Transfer (ATWT=)
+    ATCMD_ATPN,         //5 Set Profile (ATPN=)
+    ATCMD_ATPW,         //6 Set WiFi mode (ATPW=)
+    ATCMD_ATPA,         //7 Connect to AP (ATPA=)
+    ATCMD_ATPI,         //8 Query info (ATPI)
+    ATCMD_ATPS,         // Create TCP/UDP/SSL Server (ATPS=)
+    ATCMD_ATSL,         // Sleep Mode (ATSL=)
+    ATCMD_ATWO,         // WiFi Output Power (ATWO=)
+    ATCMD_ATSD,         // SD Card Test (ATSD=)
+    ATCMD_ATST,         // WiFi Status (ATST=)
     ATCMD_ATWD,         // WiFi Disconnect (ATWD)
     ATCMD_NUM
 } T_ATCMD_TYPE;
@@ -94,7 +107,7 @@ typedef struct
 {
     const char      *p_cmd;         // Command string (e.g., "ATPN=")
     const char      *p_rsp;         // Response prefix (e.g., "[ATPN]")
-    T_AT_CMD_RSP     rsp_func;      // Response handler function
+    T_AT_CMD_RSP     rsp_func;       // Response handler function
     uint32_t         timeout_ms;    // Timeout in milliseconds
 } T_AT_CMD_TABLE_ENTRY;
 #endif
@@ -106,7 +119,7 @@ typedef struct
 {
     T_ATCMD_TYPE    cur_cmd;        // Current command being executed
     uint8_t         resend_cnt;     // Resend counter
-    uint8_t         rx_buf[512];    // RX buffer (increased from 100)
+    uint8_t         rx_buf[512];    // RX buffer
     uint16_t        rx_cnt;         // RX buffer count
 } T_AT_CMD;
 
@@ -134,10 +147,11 @@ typedef void (*app_uart_atcmd_cb_t)(T_AT_EVT_TYPE evt, void *p_data, uint16_t le
 void app_uart_atcmd_init(void);
 
 /**
- * @brief Register event callback
+ * @brief Register event callback (adds to broadcast dispatch array)
  * @param cb Callback function
+ * @return true if registered, false if dispatch table full
  */
-void app_uart_atcmd_register_callback(app_uart_atcmd_cb_t cb);
+bool app_uart_atcmd_register_callback(app_uart_atcmd_cb_t cb);
 
 /**
  * @brief Add command to queue
@@ -154,15 +168,44 @@ bool app_uart_atcmd_queue_fill(T_ATCMD_TYPE cmd, const char *param);
 void app_uart_atcmd_trigger_send_flow(void);
 
 /**
+ * @brief Whether an AT command is currently pending (sent, awaiting response).
+ * @return true if busy (a response is expected), false if idle
+ */
+bool app_uart_atcmd_is_busy(void);
+
+/**
  * @brief UART RX data handler
  * Should be called when UART data is received
  */
 void app_uart_atcmd_rsp_handler(void);
 
 /**
+ * @brief Replace IP address in command string
+ */
+int replace_ip_address(const char *cmd_str, const char *new_ip,
+                       char *output, size_t output_size);
+
+/**
  * @brief Demo function
  */
-void app_uart_atcmd_demo(uint8_t type);
+void app_uart_atcmd_demo(uint8_t *ptr);
+
+/**
+ * @brief Business functions from wifi_atcmd.c
+ */
+void cmd_list_demo(void);
+void wifi_atcmd_sleep_mode(void);
+void cmd_wifi_set_server(void);
+void cmd_wifi_download_file(void);
+void cmd_wifi_upload_file(char *str);
+void cmd_wifi_upload_file_stop(void);
+void cmd_wifi_set_client(char *str);
+
+/**
+ * @brief ATPI port getter/setter (for EVT_WIFI_CONNECT real port)
+ */
+void    app_uart_atcmd_set_atpi_port(uint16_t port);
+uint16_t app_uart_atcmd_get_atpi_port(void);
 
 #ifdef __cplusplus
 }

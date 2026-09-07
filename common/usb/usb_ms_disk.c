@@ -131,7 +131,7 @@ static T_DISK_DRIVER usb_ms_disk_driver =
 #if CONFIG_SOC_SERIES_RTL8763E
     .max_blk_per_access = 1,
 #else
-    .max_blk_per_access = 32,
+    .max_blk_per_access = 24,
 #endif
     .format = usb_ms_disk_format,
     .read = usb_ms_disk_read,

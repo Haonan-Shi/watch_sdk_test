@@ -258,12 +258,12 @@
 #include <app_pta.h>
 #endif
 
-#if (F_APP_SPI_ROLE_MASTER || F_APP_SPI_ROLE_SLAVE)
-#include "app_spi_api.h"
+#if defined(CONFIG_WIFI_8711)
+#include "wifi_8711_app.h"
 #endif
 
-#if F_APP_WIFI_SPI_CMD
-#include "app_spi_atcmd.h"
+#if (F_APP_SPI_ROLE_MASTER || F_APP_SPI_ROLE_SLAVE)
+#include "app_spi_api.h"
 #endif
 
 #if F_APP_WIFI_UART_CMD
@@ -311,6 +311,11 @@
 #include "app_lower_init.h"
 #include "pm.h"
 #include "app_key_button.h"
+
+#if F_APP_PWM_OUTPUT_SUPPORT
+#include "app_pwm_output.h"
+#include "app_key_detect.h"
+#endif
 
 #define MAX_NUMBER_OF_GAP_MESSAGE       0x20    //!< indicate BT stack message queue size
 #define MAX_NUMBER_OF_IO_MESSAGE        0x20    //!< indicate io queue size
@@ -818,6 +823,8 @@ int main(void)
 
 #if F_APP_MULTI_CHANNEL_SUPPORT
         pm_cpu_freq_set(100, &actual_mhz);
+#elif F_APP_USB_HOST_SUPPORT
+        pm_cpu_freq_set(200, &actual_mhz);
 #else
         pm_cpu_freq_set(40, &actual_mhz);
 #endif
@@ -1091,7 +1098,10 @@ int main(void)
 #if CONFIG_REALTEK_APP_GUI
     app_gui_init();
 #endif
-
+#if F_APP_PWM_OUTPUT_SUPPORT
+    app_pwm_output_init();
+    app_key_detect_init();
+#endif
 #if F_APP_USB_AUDIO_SUPPORT | F_APP_USB_MSC_SUPPORT | F_APP_USB_HID_SUPPORT | F_APP_USB_CDC_SUPPORT
     app_usb_init();
 #endif
@@ -1111,10 +1121,6 @@ int main(void)
     app_malleus_init(MALLEUS_FULL_CYCLE, MALLEUS_FULL_CYCLE);
 #endif
 
-#if F_APP_WIFI_SPI_CMD
-    app_spi_atcmd_init();
-#endif
-
 #if F_APP_WIFI_UART_CMD
     app_wifi_uart_init();
     app_uart_atcmd_init();
@@ -1126,6 +1132,10 @@ int main(void)
 
 #if CONFIG_REALTEK_APP_AI_AUTH
     app_rtk_auth_init();
+#endif
+
+#if defined(CONFIG_WIFI_8711)
+    wifi_8711_init();
 #endif
 
 #if F_APP_SPI_ROLE_MASTER

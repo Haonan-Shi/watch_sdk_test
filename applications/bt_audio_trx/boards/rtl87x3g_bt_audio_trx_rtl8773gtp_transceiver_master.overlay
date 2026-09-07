@@ -22,7 +22,7 @@
 /* SPI Sync GPIO */
 / {
     resources {
-        compatible = "bt_audio_trx_spi-gpio";
+        compatible = "spi_m2s2m-gpio";
 		m2s-gpios = < PIN_M2S_GPIO GPIO_ACTIVE_HIGH >;
 		s2m-gpios = < PIN_S2M_GPIO GPIO_ACTIVE_HIGH >;
         // s2m-gpios = < PIN_S2M_GPIO (GPIO_ACTIVE_HIGH | RTL87X3G_GPIO_INPUT_DEBOUNCE_MS(0)) >;
@@ -40,7 +40,7 @@
     dma-names = "tx", "rx";
 
     spi0_device: spi0_device@0 {
-        compatible = "bt_audio_trx_spi-device";
+        compatible = "spi_m2s2m-device";
         reg = <0>;
         spi-max-frequency = <4000000>;
         status = "okay";
@@ -238,15 +238,16 @@
 	 * 2. the sram plus heap_sram size should NOT exceed 160KByte!
 	 */
 	sram {
+
 		sram: memory@20020000 {
 			device_type = "sram region";
 			compatible = "zephyr,memory-region", "mmio-sram";
-			reg = <0x20020000 DT_SIZE_K(32)>;
+			reg = <0x20020000 DT_SIZE_K(41)>;
 			zephyr,memory-region = "SRAM";
 		};
-		heap_sram: memory@20028000 {
+		heap_sram: memory@2002A400 {
 			device_type = "heap sram region";
-			reg = <0x20028000 DT_SIZE_K(128)>;
+			reg = <0x2002A400 DT_SIZE_K(119)>;
 		};
 	};
 
@@ -255,11 +256,11 @@
 			device_type = "itcm region";
 			compatible = "zephyr,memory-region", "arm,itcm";
 			zephyr,memory-region = "ITCM";
-			reg = <0xC0C00 DT_SIZE_K(30)>;
+			reg = <0xC0C00 DT_SIZE_K(38)>;
 		};
-		heap_itcm: memory@c8400 {
+		heap_itcm: memory@CA400 {
 			device_type = "heap itcm region";
-			reg = <0xC8400 DT_SIZE_K(63)>;
+			reg = <0xCA400 DT_SIZE_K(55)>;
 		};
 	};
 

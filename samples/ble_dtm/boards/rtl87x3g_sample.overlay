@@ -1,0 +1,136 @@
+/*
+ * Copyright(c) 2024, Realtek Semiconductor Corporation.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <zephyr/dt-bindings/gpio/realtek-rtl87x3g-gpio.h>
+#include <dt-bindings/pinctrl/rtl87x3g-pinctrl.h>
+
+&gpioa {
+	status = "okay";
+};
+
+&qdec {
+	status = "okay";
+	x-counts-per-revolution = <4>;
+	x-debounce-time-ms = <5>;
+	pinctrl-0 = <&qdec_default>;
+	pinctrl-names = "default";
+};
+
+&dma0 {
+    status = "okay";
+};
+
+&rtc {
+    status = "okay";
+	channels = <1>;
+    prescaler = <1>;
+};
+
+&pinctrl {
+	qdec_default: qdec_default {
+		group1 {
+			psels = <RTL87X3G_PSEL(QDEC_PHASE_A_X, P4_0, DIR_IN, DRV_LOW, PULL_NONE)>,//TODO: update on ASIC
+			<RTL87X3G_PSEL(QDEC_PHASE_B_X, P4_0, DIR_IN, DRV_LOW, PULL_NONE)>;//TODO: update on ASIC
+		};
+	};
+	
+	sdhc0_default: sdhc0_default {
+		group1 {
+				psels = <RTL87X3G_PSEL(HS_P5_0_SDH0_CLK, P5_0, DIR_OUT, DRV_HIGH, PULL_UP)>,
+				<RTL87X3G_PSEL(HS_P5_1_SDH0_CMD, P5_1, DIR_OUT, DRV_HIGH, PULL_UP)>,
+				<RTL87X3G_PSEL(HS_P5_2_SDH0_DATA0, P5_2, DIR_OUT, DRV_HIGH, PULL_UP)>,
+				<RTL87X3G_PSEL(HS_P5_3_SDH0_DATA1, P5_3, DIR_OUT, DRV_HIGH, PULL_UP)>,
+				<RTL87X3G_PSEL(HS_P5_4_SDH0_DATA2, P5_4, DIR_OUT, DRV_HIGH, PULL_UP)>,
+				<RTL87X3G_PSEL(HS_P5_5_SDH0_DATA3, P5_5, DIR_OUT, DRV_HIGH, PULL_UP)>;
+				bias-pull-strong;
+		};
+	};
+};
+
+&sdhc0 {
+    pin-group = <0>;
+    bus-width = <1>;
+    pwr-gpios = <&gpioa 0 GPIO_ACTIVE_HIGH>;
+    pinctrl-0 = <&sdhc0_default>;
+    pinctrl-names = "default";
+    status = "okay";
+	sdcard_disk0 {
+		compatible = "zephyr,sdmmc-disk";
+		status = "okay";
+	};
+};
+
+/delete-node/ &heap_dtcm;
+/delete-node/ &heap_sram;
+/delete-node/ &heap_itcm;
+
+/ {
+	aliases {
+		qdec0 = &qdec;
+		dma-0 = &dma0;
+		rtc = &rtc;
+		sdhc0 = &sdhc0;
+    };
+	
+	/* DTCM addr: 0x20000000~0x20020000, total size: 128KByte.
+	 * The front 46Kbyte was taken by RTK internal.
+	 * If users wants to increase global variables and zephyr static heap,
+	 * please follow the steps:
+	 * 1. increase dtcm size value "reg = <0x2000B800 DT_SIZE_K(NEW_SIZE)>"
+	 * 2. modify heap_dtcm addr label "heap_dtcm: memory@NEW_ADDR"
+	 * 3. modify heap_dtcm reg addr "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * 4. decrease heap_dtcm size value "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * Warning: 
+	 * 1. the dtcm address should NOT modified!
+	 * 2. the dtcm plus heap_dtcm size should NOT exceed 82KByte!
+	 */
+	dtcm {
+		dtcm: memory@2000b800 {
+			device_type = "dtcm region";
+			reg = <0x2000B800 DT_SIZE_K(81)>;
+		};
+		heap_dtcm: memory@2001fc00 {
+			device_type = "heap dtcm region";
+			reg = <0x2001FC00 DT_SIZE_K(1)>;
+		};
+	};
+	/* sram addr: 0x20020000~0x20048000, total size: 160KByte.
+	 * call zephyr_code_relocate(FILES xxx.x LOCATION SRAM) at cmakelist could relocate variables on sram. 
+	 * for more information, please refer to https://docs.zephyrproject.org/latest/kernel/code-relocation.html
+	 * If users wants to increase sram size, please follow the steps:
+	 * 1. increase sram size value "reg = <0x20020000 DT_SIZE_K(NEW_SIZE)>"
+	 * 2. modify heap_sram addr label "heap_sram: memory@NEW_ADDR"
+	 * 3. modify heap_sram reg addr "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * 4. decrease heap_sram size value "reg = <NEW_ADDR DT_SIZE_K(NEW_SIZE)>"
+	 * Warning: 
+	 * 1. the sram address should NOT modified!
+	 * 2. the sram plus heap_sram size should NOT exceed 160KByte!
+	 */
+	sram {
+		sram: memory@20020000 {
+			reg = <0x20020000 DT_SIZE_K(32)>;
+			zephyr,memory-region = "SRAM";
+		};
+		heap_sram: memory@20028000 {
+			device_type = "heap sram region";
+			reg = <0x20028000 DT_SIZE_K(128)>;
+		};
+	};
+
+	itcm {
+		itcm: memory@c0c00 {
+			device_type = "itcm region";
+			compatible = "zephyr,memory-region", "arm,itcm";
+			zephyr,memory-region = "ITCM";
+			reg = <0xC0C00 DT_SIZE_K(23)>;
+		};
+		heap_itcm: memory@c6800 {
+			device_type = "heap itcm region";
+			reg = <0xC6800 DT_SIZE_K(70)>;
+		};
+	};
+};
+

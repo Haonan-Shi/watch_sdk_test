@@ -18,6 +18,10 @@
 #include "bt_gatt_client.h"
 #endif
 
+#if CONFIG_REALTEK_APP_AI_RECORD
+#include "app_ai_record.h"
+#endif
+
 #define POS_GATT_SERVICE_START_HANDLE   29
 
 static uint8_t att_gatt_sdp_record[] =

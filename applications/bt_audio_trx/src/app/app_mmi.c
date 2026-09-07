@@ -1734,6 +1734,7 @@ void app_mmi_handle_action(uint8_t action)
     case MMI_AI_VOICE_START:
     case MMI_AI_VOICE_STOP:
         {
+            extern bool app_ai_record_mmi_handle(uint8_t action);
             app_ai_record_mmi_handle(action);
         }
         break;
