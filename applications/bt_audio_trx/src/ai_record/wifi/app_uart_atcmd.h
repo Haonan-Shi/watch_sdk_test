@@ -56,6 +56,7 @@ typedef enum
     AT_EVT_WIFI_DISCONNECTED,   // WiFi disconnected
     AT_EVT_WIFI_GOT_IP,         // Got IP address
     AT_EVT_UNKNOWN_DATA,        // Unknown/unsolicited data
+    AT_EVT_MODULE_READY,        // Module boot banner ("COMMAND READY"): AT engine up
 } T_AT_EVT_TYPE;
 
 /**

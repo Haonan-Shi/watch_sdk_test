@@ -315,6 +315,15 @@ static void uart_async_callback(const struct device *dev, struct uart_event *evt
              * chunk is still fed to the parser as-is. */
             uint16_t rx_len = evt->data.rx.len;
             uint8_t *rx_p   = &evt->data.rx.buf[evt->data.rx.offset];
+
+            /* Scan the raw chunk for the module's "COMMAND READY" boot banner
+             * BEFORE the wifi_enable_flag gate / parser: the banner arrives while
+             * the gate is still closed (wifi_enable_flag == 0), so it never reaches
+             * wifi_uart_console_recv(). This latches app_wifi_uart_module_is_ready()
+             * so the cold-start bring-up can send ATPN the moment the module is up
+             * instead of blind-waiting the full ready-timeout. */
+            wifi_uart_scan_cmd_ready(rx_p, rx_len);
+
             for (uint16_t off = 0; off < rx_len; off += WIFI_UART_RX_DUMP_SEG)
             {
                 uint16_t seg = ((rx_len - off) > WIFI_UART_RX_DUMP_SEG)

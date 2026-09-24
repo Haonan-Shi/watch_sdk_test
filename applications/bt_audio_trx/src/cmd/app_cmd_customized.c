@@ -13,6 +13,10 @@
 #include "app_cmd_customized.h"
 #include "app_audio_route.h"
 #include "app_main.h"
+#include "pm.h"                /* pm_cpu_freq_get */
+#include "clk_mgr.h"
+#include "usbh_mgr.h"          /* usbh_mgr_start / usbh_mgr_stop */
+#include "app_usbh_audio.h"    /* app_usbh_audio_set_param, clk_user_usbh */
 
 void app_cmd_customized_cmd_handle(uint8_t *cmd_ptr, uint16_t cmd_len, uint8_t cmd_path,
                                    uint8_t app_idx, uint8_t *ack_pkt)
@@ -110,11 +114,21 @@ void app_cmd_customized_cmd_handle(uint8_t *cmd_ptr, uint16_t cmd_len, uint8_t c
         {
             if (cmd_ptr[2] == 0x01)
             {
+                if (clk_user_usbh)
+                {
+                    clk_mgr_set_high_performance(clk_user_usbh);
+                }
+                APP_PRINT_WARN1("app_task: cpu freq %d MHz", pm_cpu_freq_get());
                 usbh_mgr_start();
             }
             else if (cmd_ptr[2] == 0x00)
             {
                 usbh_mgr_stop();
+                if (clk_user_usbh)
+                {
+                    clk_mgr_set_normal_performance(clk_user_usbh);
+                }
+                APP_PRINT_WARN1("app_task: cpu freq %d MHz", pm_cpu_freq_get());
             }
             else
             {

@@ -27,12 +27,17 @@ typedef enum
     WIFI_8711_EVENT_SPI_MASTER_DATA_IN = 0,
     WIFI_8711_EVENT_SPI_MASTER_TRIGGER = 1,
     WIFI_8711_EVENT_ATCMD_FLOW_CTRL    = 2,
+    /* Run msg.msg_cb on the wifi_8711 task. Lets callers defer work that must
+     * NOT run in a BLE/GATT callback (e.g. the ~2s 8711 power-on settle before
+     * the first AT+WLCONN) onto this task, where a blocking os_delay is safe. */
+    WIFI_8711_EVENT_USER_CB            = 3,
 } T_WIFI_8711_EVENT;
 
 typedef struct
 {
-    uint16_t event;    /* T_WIFI_8711_EVENT                                */
-    void    *buf;      /* SPI rx_msg pointer for *_DATA_IN events, else NULL */
+    uint16_t event;             /* T_WIFI_8711_EVENT                            */
+    void    *buf;               /* SPI rx_msg ptr for *_DATA_IN, else user arg  */
+    void (*msg_cb)(void *);     /* callback for WIFI_8711_EVENT_USER_CB, else 0 */
 } T_WIFI_8711_MSG;
 
 /**
@@ -49,6 +54,20 @@ bool app_send_msg_to_wifi_8711_task(T_WIFI_8711_MSG *p_msg);
  *        in app/app_main.c.
  */
 void wifi_8711_init(void);
+
+/**
+ * @brief Power the external 8711 Wi-Fi IC on by driving WIFI_EN (P0_0) high.
+ *
+ *  8773GTP record-pen wiring: the 8711's CHIP_EN is tied to 3V3 (asserted with
+ *  system power, no MCU control), so WIFI_EN is the only software power gate.
+ *  This only toggles the pin (fast, non-blocking); the module needs ~2s to boot
+ *  afterwards, so the caller must wait before issuing the first AT command
+ *  (see the CMD_WIFI_CONNECT bring-up path). Idempotent.
+ */
+void wifi_8711_power_on(void);
+
+/** @brief Power the 8711 down by driving WIFI_EN (P0_0) low. */
+void wifi_8711_power_down(void);
 
 #ifdef __cplusplus
 }

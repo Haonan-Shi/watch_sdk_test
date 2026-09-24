@@ -107,6 +107,8 @@ extern "C" {
 #define CMD_UPLOAD_FILE                     0x0694  /**< spec x8.2 */
 #define CMD_UPLOAD_CANCEL                   0x0695  /**< spec x8.3 */
 #define CMD_SCAN_FILES                      0x0696  /**< spec V4.1 x9.2 */
+#define CMD_WIFI_POWER_ON                   0x0697  /**< spec V4.1 x7.2 */
+#define CMD_WIFI_POWER_OFF                  0x0698  /**< spec V4.1 x7.5 */
 
 /* Record_pen to Phone: notify events */
 #define EVT_QUERY_INFO                      0x0680  /**< spec V4.1 (32B device info) */
@@ -116,6 +118,8 @@ extern "C" {
 #define EVT_UPLOAD_FILE                     0x0693  /**< spec x8.2 (Multi-Event Flag) */
 #define EVT_UPLOAD_CANCEL                   0x0694  /**< spec x8.3 */
 #define EVT_SCAN_FILES                      0x0695  /**< spec V4.1 x9.2 (Multi-Event Flag) */
+#define EVT_WIFI_POWER_ON                   0x0696  /**< spec V4.1 x7.2 */
+#define EVT_WIFI_POWER_OFF                  0x0697  /**< spec V4.1 x7.5 */
 
 /*============================================================================*
  *                              EVT_UPLOAD_FILE Flags
@@ -201,11 +205,16 @@ typedef enum
     SCAN_ERR_INTERNAL_ERROR      = 0x12,
 } T_AI_REC_SCAN_ERR;
 
-/** @brief Default batch cap if Tool sends 0 in CMD_SCAN_FILES Byte2. */
-#define AI_REC_SCAN_DEFAULT_BATCH           16
+/** @brief CMD_SCAN_FILES Byte2 (batch) is advisory only.
+ *  Credit-gated delivery (ai_rec_trans_scan_pump) paces every frame to the LE
+ *  TX credit pool, so the whole listing is always delivered in one command and
+ *  batch_cap no longer truncates it. Kept for protocol/wire compatibility. */
+#define AI_REC_SCAN_DEFAULT_BATCH           0xFF
 
-/** @brief Hard upper bound on entries we ever emit per scan invocation. */
-#define AI_REC_SCAN_MAX_BATCH               256
+/** @brief Safety clamp on entries emitted per scan, bounded by the 16-bit
+ *  entry-index wire field. Not a batch-size knob: START.total is clamped to
+ *  the same value so the host's total==delivered check always holds. */
+#define AI_REC_SCAN_MAX_BATCH               0xFFFF
 
 /** @brief Byte7 of UPLOAD_FLAG_START frame: file_format_t.
  *
@@ -309,7 +318,17 @@ typedef enum
     WIFI_RESULT_HARDWARE_ERROR      = 0x14,
     WIFI_RESULT_ALREADY_CONNECTED   = 0x15,
     WIFI_RESULT_NOT_SUPPORTED       = 0x16,
+    WIFI_RESULT_NOT_POWERED_ON      = 0x17,
+    WIFI_RESULT_BUSY                = 0x18,
 } T_AI_REC_WIFI_RESULT;
+
+
+typedef enum
+{
+    WIFI_IF_SPI_8711   = 0x00,   /**< 8773GTP + 8711(SPI) */
+    WIFI_IF_SDIO_8783  = 0x01,   /**< RTL8783GBF (SDIO) */
+    WIFI_IF_UNKNOWN    = 0xFF,
+} T_AI_REC_WIFI_IF;
 
 /** @brief WiFi state machine (EVT_WIFI_GET_STATUS byte 0).
  *         Initial value is DISCONNECTED (0x00) - works with the bss
@@ -321,8 +340,10 @@ typedef enum
     WIFI_STATE_CONNECTED     = 0x02,
     WIFI_STATE_DISCONNECTING = 0x03,
     WIFI_STATE_FAIL          = 0x04,
-    WIFI_STATE_ATPS_PENDING  = 0x05,  /**< ATPN OK received; waiting for ATPS */
-    WIFI_STATE_ATPI_PENDING  = 0x06,  /**< ATPS OK received; waiting for ATPI */
+    WIFI_STATE_ATPS_PENDING  = 0x05,
+    WIFI_STATE_ATPI_PENDING  = 0x06,
+    WIFI_STATE_POWERING_ON   = 0x07,
+    WIFI_STATE_POWERED_OFF   = 0x08,
 } T_AI_REC_WIFI_STATE;
 
 /** @brief Spec-imposed length caps. */
@@ -382,6 +403,26 @@ bool app_ai_record_file_trans_is_busy(void);
  * @brief  Local abort (e.g. on disconnect). Safe to call when idle.
  */
 void app_ai_record_file_trans_cancel(void);
+
+/**
+ * @brief  Handle a CMD_WIFI_POWER_OFF (0x0698) received over the WiFi TCP data
+ *         channel (spi/wifi file-upload). Reuses the BLE-path power-off logic:
+ *         powers the WiFi module down, resets state, and restores the BLE
+ *         connection interval.
+ *
+ *  The EVT_WIFI_POWER_OFF reply is sent over the always-on BLE notify channel
+ *  (NOT over TCP): powering the module off tears the TCP socket down, so a
+ *  TCP-borne ack could not reach the phone. The phone should listen for the
+ *  power-off ack on BLE (or treat the socket close as confirmation).
+ *
+ *  NOTE: over TCP the module is by definition connected, so Force=0 will be
+ *  rejected with 0x18 busy - the phone must set Force (Bit0) when powering off
+ *  via the TCP channel.
+ *
+ *  @param body  Flags byte payload (may be NULL/empty; Bit0=Force, Bit1=Forget).
+ *  @param blen  Length of @p body.
+ */
+void app_ai_record_wifi_power_off_from_tcp(const uint8_t *body, uint16_t blen);
 
 /**
  * @brief  Tell the module about CCCD enable/disable. The module gates

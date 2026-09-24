@@ -215,7 +215,11 @@ static void app_ota_erase_ota_header(void)
         ota_struct.test.t_stress_test = 0;
         if (is_ota_support_bank_switch())
         {
+#ifdef CONFIG_SOC_SERIES_RTL87X3G
+            fmc_flash_nor_unlock_block_protect(flash_partition_addr_get(PARTITION_FLASH_OTA_BANK_0));
+#else
             fmc_flash_nor_set_bp_lv(flash_partition_addr_get(PARTITION_FLASH_OTA_BANK_0), DISABLE_FLASH_BP);
+#endif
             uint32_t header_addr = get_active_ota_bank_addr();
             fmc_flash_nor_erase(header_addr, FMC_FLASH_NOR_ERASE_SECTOR);
         }
@@ -411,7 +415,11 @@ static uint8_t app_ota_start_dfu_handle(uint8_t *p_data)
     ota_struct.ota_temp_buf_used_size = 0;
     ota_struct.cur_offset = 0;
 
+#ifdef CONFIG_SOC_SERIES_RTL87X3G
+    fmc_flash_nor_unlock_block_protect(flash_partition_addr_get(PARTITION_FLASH_OTA_BANK_0));
+#else
     fmc_flash_nor_set_bp_lv(flash_partition_addr_get(PARTITION_FLASH_OTA_BANK_0), DISABLE_FLASH_BP);
+#endif
 
     return results;
 }

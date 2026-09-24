@@ -209,6 +209,14 @@ typedef enum
     STATE_SCANNING,
 } fsm_state_t;
 
+typedef enum
+{
+    UPLOAD_PHASE_IDLE = 0,
+    UPLOAD_PHASE_START_WAIT_OK,
+    UPLOAD_PHASE_BULK_QUEUE_PENDING,
+    UPLOAD_PHASE_BULK_WAIT_OK,
+} upload_phase_t;
+
 static T_SPI_UPLOAD_CFG s_cfg;
 static uint8_t          *s_tx_buf;
 static fsm_state_t       s_state = STATE_IDLE;
@@ -243,8 +251,19 @@ static struct
     bool              cancel_pending;
     bool              start_evt_sent;
     uint8_t           sendraw_retries;
-    bool              bulk_active;        /* true between START-EVT OK and bulk OK */
+    upload_phase_t    phase;              /* identifies which SENDRAW owns the next OK */
 } s_upload;
+
+/* The APK starts the next batch item as soon as it consumes the current
+ * file's END frame. At that instant the 8711 may still owe the terminal OK
+ * for the enclosing bulk SKTSENDRAW. Hold one next-file request instead of
+ * rejecting it as busy; it is started only after that OK releases the current
+ * upload session. */
+static struct
+{
+    uint8_t *body;
+    uint16_t body_len;
+} s_pending_upload;
 
 /* Scan context ----------------------------------------------------------- */
 static struct
@@ -270,6 +289,7 @@ static uint8_t s_tx_seq;
  *                              Forward declarations
  *============================================================================*/
 
+static void handle_upload_file(const uint8_t *body, uint16_t body_len);
 static void upload_tick(void);
 static void scan_tick(void);
 static void post_tick(void);
@@ -711,6 +731,26 @@ static void handle_upload_file(const uint8_t *body, uint16_t body_len)
     }
     if (s_state != STATE_IDLE)
     {
+        /* The APK sends the next 0x694 immediately after receiving the previous
+         * file's END data frame. The 8711 can still be draining that bulk send,
+         * so retain one next-file request instead of returning an ERROR frame.
+         * Once the previous bulk OK arrives, the queued request starts normally
+         * with its own START (Flag=0x00), before any CONTINUE/END data. */
+        if (s_state == STATE_UPLOADING &&
+            s_upload.phase == UPLOAD_PHASE_BULK_WAIT_OK &&
+            s_pending_upload.body == NULL)
+        {
+            s_pending_upload.body = os_mem_alloc(RAM_TYPE_DATA_ON, body_len);
+            if (s_pending_upload.body != NULL)
+            {
+                memcpy(s_pending_upload.body, body, body_len);
+                s_pending_upload.body_len = body_len;
+                APP_PRINT_INFO1("handle_upload_file: queued next request, len=%u", body_len);
+                return;
+            }
+            APP_PRINT_ERROR0("handle_upload_file: alloc pending request fail");
+        }
+
         APP_PRINT_ERROR1("handle_upload_file: busy state=%d", (int)s_state);
         send_upload_error(SPI_UPLOAD_ERR_TRANSPORT);
         return;
@@ -768,7 +808,7 @@ static void handle_upload_file(const uint8_t *body, uint16_t body_len)
     s_upload.start_evt_sent = false;
     s_upload.file_open      = false;
     s_upload.sendraw_retries = 0;
-    s_upload.bulk_active    = false;
+    s_upload.phase          = UPLOAD_PHASE_IDLE;
 
     APP_PRINT_INFO3("handle_upload_file: path=%s size=%u start_off=%u",
                     TRACE_STRING(s_upload.path), s_upload.total_len, s_upload.start_offset);
@@ -953,6 +993,18 @@ bool spi_file_upload_on_tcp_rx(const uint8_t *frame, uint16_t frame_len)
     case SPI_UPLOAD_CMD_SCAN_FILES:
         handle_scan_files(body, blen);
         break;
+    case SPI_UPLOAD_CMD_WIFI_POWER_OFF:
+        /* WiFi power-off arrived over the TCP data channel. Route to the shared
+         * BLE-path power-off (powers the 8711 down + resets state + restores the
+         * BLE interval + sends EVT_WIFI_POWER_OFF over BLE). The ack is NOT sent
+         * over TCP because the power-off tears this socket down. Defined in
+         * ai_record/app_ai_record_file_trans.c. */
+        {
+            extern void app_ai_record_wifi_power_off_from_tcp(const uint8_t *body,
+                                                              uint16_t blen);
+            app_ai_record_wifi_power_off_from_tcp(body, blen);
+        }
+        break;
     default:
         APP_PRINT_WARN1("spi_file_upload_on_tcp_rx: unknown cmd 0x%04x", cmd_id);
         return false;
@@ -966,59 +1018,49 @@ bool spi_file_upload_on_tcp_rx(const uint8_t *frame, uint16_t frame_len)
 
 void spi_file_upload_on_sendraw_ok(void)
 {
-    APP_PRINT_TRACE0("spi_file_upload_on_sendraw_ok");
+    APP_PRINT_INFO1("spi_file_upload_on_sendraw_ok: phase=%d", (int)s_upload.phase);
 
     if (s_state != STATE_UPLOADING)
     {
         return;
     }
 
-    if (!s_upload.bulk_active)
+    if (s_upload.phase == UPLOAD_PHASE_START_WAIT_OK)
     {
-        /* START EVT was confirmed by the Wi-Fi module.
-         * Open the file and begin the bulk data SKTSENDRAW. */
-        s_upload.bulk_active = true;
-
-        /* -- calculate the combined TCP-frame size of every chunk -- */
-        uint32_t total_tcp = 0;
-        uint32_t rem       = s_upload.total_len;
-        while (rem > 0)
-        {
-            uint16_t chunk = (rem > s_upload.chunk_size)
-                             ? s_upload.chunk_size : (uint16_t)rem;
-            total_tcp += (uint32_t)(17 + chunk);   /* 6-byte header + 11-byte body + data */
-            rem -= chunk;
-        }
-
-        /* queue a single AT+SKTSENDRAW that covers the whole file */
-        app_spi_atcmd_set_bulk_mode(true, total_tcp);
-        char cmd_line[40];
-        snprintf(cmd_line, sizeof(cmd_line), "AT+SKTSENDRAW=1,%u\r\n",
-                 (unsigned)total_tcp);
-        app_spi_atcmd_queue_fill(ATCMD_SENDRAW, cmd_line);
-        app_spi_atcmd_trigger_send_flow();
+        /* The current file's START EVT (Flag=0x00) has reached the Wi-Fi module.
+         * Only now may CONTINUE/END data be queued. Keeping this as an explicit
+         * phase prevents a delayed OK from the previous file being mistaken for
+         * confirmation of this file's START EVT. */
+        s_upload.phase = UPLOAD_PHASE_BULK_QUEUE_PENDING;
+        post_tick();
     }
-    else
+    else if (s_upload.phase == UPLOAD_PHASE_BULK_WAIT_OK)
     {
-        /* Bulk-data SKTSENDRAW confirmed -- send the END EVT. */
-        s_upload.bulk_active = false;
-
-        uint16_t m = build_upload_chunk_evt(s_tx_buf, SPI_UPLOAD_FLAG_END,
-                                            s_upload.seq, 0,
-                                            s_upload.cur_offset, 0);
-        if (!send_spi_response(SPI_UPLOAD_EVT_UPLOAD_FILE, s_tx_buf, m))
-        {
-            post_tick();                     /* retry via timer */
-            return;
-        }
-
-        /* file already closed by bulk_push */
+        /* The last data frame already carried Flag=END. Keep the session busy
+         * until the bulk SENDRAW OK arrives, then release it. */
+        s_upload.phase = UPLOAD_PHASE_IDLE;
         app_dlps_enable(APP_DLPS_ENTER_CHECK_INIT);
         if (clk_mgr_upload_handle)
         {
             clk_mgr_set_normal_performance(clk_mgr_upload_handle);
         }
         s_state = STATE_IDLE;
+
+        if (s_pending_upload.body != NULL)
+        {
+            uint8_t *pending_body = s_pending_upload.body;
+            uint16_t pending_len = s_pending_upload.body_len;
+            s_pending_upload.body = NULL;
+            s_pending_upload.body_len = 0;
+            APP_PRINT_INFO1("spi_file_upload: start queued request, len=%u", pending_len);
+            handle_upload_file(pending_body, pending_len);
+            os_mem_free(pending_body);
+        }
+    }
+    else
+    {
+        APP_PRINT_WARN1("spi_file_upload_on_sendraw_ok: unexpected phase=%d",
+                        (int)s_upload.phase);
     }
 }
 
@@ -1043,6 +1085,7 @@ void spi_file_upload_on_sendraw_error(void)
             {
                 clk_mgr_set_normal_performance(clk_mgr_upload_handle);
             }
+            s_upload.phase = UPLOAD_PHASE_IDLE;
             s_state = STATE_IDLE;
             return;
         }
@@ -1391,6 +1434,10 @@ static void upload_tick(void)
             return;
         }
 
+        /* The next SENDRAW OK belongs to this file's START frame. Data must not
+         * be queued until that acknowledgement arrives. */
+        s_upload.phase = UPLOAD_PHASE_START_WAIT_OK;
+
         fs_file_t_init(&s_upload.file);
         int rc = fs_open(&s_upload.file, s_upload.path, FS_O_READ);
         if (rc < 0)
@@ -1403,6 +1450,7 @@ static void upload_tick(void)
             {
                 clk_mgr_set_normal_performance(clk_mgr_upload_handle);
             }
+            s_upload.phase = UPLOAD_PHASE_IDLE;
             s_state = STATE_IDLE;
             return;
         }
@@ -1420,6 +1468,7 @@ static void upload_tick(void)
                 {
                     clk_mgr_set_normal_performance(clk_mgr_upload_handle);
                 }
+                s_upload.phase = UPLOAD_PHASE_IDLE;
                 s_state = STATE_IDLE;
                 return;
             }
@@ -1430,23 +1479,68 @@ static void upload_tick(void)
 
         if (deliver == 0)
         {
+            /* The START SENDRAW must finish before its END is sent. */
+            return;
+        }
+        return;
+    }
+
+    if (s_upload.phase == UPLOAD_PHASE_BULK_QUEUE_PENDING)
+    {
+        uint32_t total_tcp = 0;
+        uint32_t rem       = s_upload.total_len - s_upload.start_offset;
+
+        if (rem == 0)
+        {
             uint16_t m = build_upload_chunk_evt(s_tx_buf, SPI_UPLOAD_FLAG_END,
                                                 s_upload.seq, 0,
                                                 s_upload.cur_offset, 0);
-            (void)send_spi_response(SPI_UPLOAD_EVT_UPLOAD_FILE, s_tx_buf, m);
+            if (!send_spi_response(SPI_UPLOAD_EVT_UPLOAD_FILE, s_tx_buf, m))
+            {
+                post_tick();
+                return;
+            }
+
             close_upload();
             app_dlps_enable(APP_DLPS_ENTER_CHECK_INIT);
             if (clk_mgr_upload_handle)
             {
                 clk_mgr_set_normal_performance(clk_mgr_upload_handle);
             }
+            s_upload.phase = UPLOAD_PHASE_IDLE;
             s_state = STATE_IDLE;
             return;
         }
+
+        while (rem > 0)
+        {
+            uint16_t chunk = (rem > s_upload.chunk_size)
+                             ? s_upload.chunk_size : (uint16_t)rem;
+            total_tcp += (uint32_t)(17 + chunk);   /* 6-byte header + 11-byte body + data */
+            rem -= chunk;
+        }
+
+        /* START has completed. Queue the data stream only after the AT engine
+         * has retired that START command, so its raw pointer cannot be replaced
+         * before the START frame is actually sent. */
+        app_spi_atcmd_set_bulk_mode(true, total_tcp);
+        char cmd_line[40];
+        snprintf(cmd_line, sizeof(cmd_line), "AT+SKTSENDRAW=1,%u\r\n",
+                 (unsigned)total_tcp);
+        if (!app_spi_atcmd_queue_fill(ATCMD_SENDRAW, cmd_line))
+        {
+            APP_PRINT_ERROR0("spi_file_upload: queue bulk SENDRAW fail");
+            app_spi_atcmd_set_bulk_mode(false, 0);
+            post_tick();
+            return;
+        }
+
+        s_upload.phase = UPLOAD_PHASE_BULK_WAIT_OK;
+        app_spi_atcmd_trigger_send_flow();
         return;
     }
 
-    /* START EVT was sent -- on_sendraw_ok() will begin the bulk push */
+    /* START or bulk SENDRAW is in flight; its callback advances the phase. */
 }
 
 static void scan_tick(void)
@@ -1569,6 +1663,7 @@ int spi_file_upload_init(const T_SPI_UPLOAD_CFG *cfg)
     }
 
     memset(&s_upload, 0, sizeof(s_upload));
+    memset(&s_pending_upload, 0, sizeof(s_pending_upload));
     memset(&s_scan, 0, sizeof(s_scan));
     s_tx_seq = 0;
     s_state  = STATE_IDLE;
@@ -1594,6 +1689,13 @@ void spi_file_upload_deinit(void)
     close_upload();
     close_scan();
     app_stop_timer(&s_timer_tick_handle);
+    if (s_pending_upload.body != NULL)
+    {
+        os_mem_free(s_pending_upload.body);
+        s_pending_upload.body = NULL;
+        s_pending_upload.body_len = 0;
+    }
+    s_upload.phase = UPLOAD_PHASE_IDLE;
     s_state  = STATE_IDLE;
     s_inited = false;
     APP_PRINT_INFO0("spi_file_upload_deinit");

@@ -101,6 +101,10 @@ static bool app_usb_dev_trigger_evt(T_USB_EVT evt,  uint32_t param);
 static BtPowerMode bt_pwr_state = BTPOWER_ACTIVE;
 static POWERMode s_pwr_state = POWER_DLPS_MODE;
 
+#if F_APP_USB_MSC_SUPPORT
+static bool app_usb_msc_inited = false;
+#endif
+
 static void app_usb_set_hp_mode(void)
 {
     uint32_t actual_mhz = 0;
@@ -304,12 +308,19 @@ static void app_usb_dm_evt_handle(uint8_t evt, uint32_t data)
                 {
 #if F_APP_USB_MSC_SUPPORT
                     extern int usb_ms_scsi_init(void);
-                    usb_ms_scsi_init();
                     extern int usb_ms_disk_init(void);
-                    os_mem_peek_printf();
 
-                    usb_ms_disk_init();
-                    usb_msc_init();
+                    os_mem_peek_printf();
+                    if (usb_ms_disk_init() == 0)
+                    {
+                        usb_ms_scsi_init();
+                        usb_msc_init();
+                        app_usb_msc_inited = true;
+                    }
+                    else
+                    {
+                        APP_PRINT_WARN0("app_usb: disk not ready, skip MSC init");
+                    }
                     os_mem_peek_printf();
 #endif
                 }
@@ -319,10 +330,15 @@ static void app_usb_dm_evt_handle(uint8_t evt, uint32_t data)
                 {
 #if F_APP_USB_MSC_SUPPORT
                     extern int usb_ms_scsi_deinit(void);
-                    usb_ms_scsi_deinit();
                     extern int usb_ms_disk_deinit(void);
-                    usb_ms_disk_deinit();
-                    usb_msc_deinit();
+
+                    if (app_usb_msc_inited)
+                    {
+                        usb_ms_scsi_deinit();
+                        usb_ms_disk_deinit();
+                        usb_msc_deinit();
+                        app_usb_msc_inited = false;
+                    }
 #endif
                 }
                 break;

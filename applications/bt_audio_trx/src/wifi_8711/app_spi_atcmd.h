@@ -50,7 +50,8 @@ typedef enum
     AT_EVT_WIFI_CONNECTED,
     AT_EVT_WIFI_GOT_IP,
     AT_EVT_WIFI_DISCONNECTED,
-    AT_EVT_UNKNOWN_DATA
+    AT_EVT_UNKNOWN_DATA,
+    AT_EVT_MODULE_READY,    /* 8711 boot banner ("ATCMD READY"): AT engine is up */
 } T_AT_EVT_TYPE;
 
 typedef enum
@@ -95,6 +96,12 @@ void spi_atcmd_flow_ctrl_handler(void);
 bool app_spi_atcmd_queue_fill(T_ATCMD_TYPE cmd, char *param);
 bool app_spi_atcmd_sendraw(const char *cmd_line, const uint8_t *raw, uint16_t raw_len);
 void app_spi_atcmd_init(void);
+
+/* Reset the AT engine's transient state (in-flight cmd, RX buffer, SENDRAW /
+ * bulk / stream / throughput flags, pending cmd queue) to idle, without tearing
+ * down the task/queue/callbacks. Call on WiFi power-off and before power-on so a
+ * rebooted 8711's "ATCMD READY" banner is parsed cleanly as an unsolicited line. */
+void app_spi_atcmd_reset(void);
 
 /* --- downlink RX byte tap ----------------------------------------------- *
  * Sum the payload bytes of every valid SPI frame received from the slave,

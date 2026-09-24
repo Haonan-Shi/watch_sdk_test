@@ -1,0 +1,69 @@
+/*
+ * Copyright (c) 2026, Realtek Semiconductor Corporation
+ *
+ * SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+ *
+ * Board overlay shared by all four tinyml applications.
+ *
+ * 1. Data UART (uart2) for the benchmark app's host protocol.
+ *    The board devicetree declares uart2 on P3_0 (RX) / P3_1 (TX) but leaves
+ *    it disabled by default (the RTK trace/LOG UART is used for console). The
+ *    bench app drives uart2 through the Zephyr interrupt-driven UART API, so
+ *    mark it "okay" and set 115200 baud for the host protocol. Enabling it is
+ *    harmless for the ic/kws/motion apps, which never open it.
+ *
+ * 2. PSRAM regions.
+ *    Every app routes its ts_realtek allocations (tensor arena, feature
+ *    buffers, MicroProfiler) to the external-PSRAM heap in psRam_heap.c; the
+ *    ~100KB on-chip DATA_ON heap is too small. Declaring the PSRAM regions here
+ *    (and initialising the SPIC controllers via tinyml_psram_init() in main())
+ *    makes external PSRAM memory-mapped so those allocations can be placed
+ *    there.
+ *
+ *    The psram0 / psram1 node labels are matched by DT_NODE_HAS_STATUS() in
+ *    tinyml_psram.c to decide which controller (FMC_SPIC_ID_1 / FMC_SPIC_ID_3)
+ *    to bring up. #address-cells / #size-cells are required so dtc can decode
+ *    the memory@<addr> unit addresses of the child regions.
+ */
+
+&uart2 {
+    status = "okay";
+    current-speed = <115200>;
+};
+
+/ {
+    psram0: psram0 {
+        #address-cells = <1>;
+        #size-cells = <1>;
+        psram0_for_mcu: memory@22000000 {
+            compatible = "zephyr,memory-region";
+            device_type = "psram 0 region";
+            reg = <0x22000000 DT_SIZE_K(4096)>;
+            zephyr,memory-region = "PSRAM0_MCU";
+        };
+    };
+
+    psram1: psram1 {
+        #address-cells = <1>;
+        #size-cells = <1>;
+        psram1_for_dsp: memory@24000000 {
+            compatible = "zephyr,memory-region";
+            device_type = "psram 1 region";
+            reg = <0x24000000 DT_SIZE_K(512)>;
+            zephyr,memory-region = "PSRAM1_DSP";
+        };
+        psram1_for_mcu: memory@24080000 {
+            compatible = "zephyr,memory-region";
+            device_type = "psram 1 region";
+            reg = <0x24080000 DT_SIZE_K(2560)>;
+            zephyr,memory-region = "PSRAM1_MCU";
+        };
+        /* Last 1M of psram1: dedicated non-cacheable region (NOLOAD). */
+        psram1_nc: memory@24300000 {
+            compatible = "zephyr,memory-region";
+            device_type = "psram 1 region";
+            reg = <0x24300000 DT_SIZE_K(1024)>;
+            zephyr,memory-region = "PSRAM1_NC";
+        };
+    };
+};

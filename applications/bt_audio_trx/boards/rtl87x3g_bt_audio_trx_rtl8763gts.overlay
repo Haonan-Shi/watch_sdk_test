@@ -250,8 +250,6 @@
 			reg = <0x20020400 DT_SIZE_K(159)>;
 		};
 	};
-
-	};
 	
 	itcm {
 		itcm: memory@c0c00 {

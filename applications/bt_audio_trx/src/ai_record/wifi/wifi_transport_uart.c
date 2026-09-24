@@ -9,6 +9,7 @@
 #include "wifi_transport.h"
 #include "wifi/app_uart_atcmd.h"
 #include "wifi/wifi_file_upload.h"
+#include "wifi/wifi_app.h"      /* wifi_enable() - 8783GBF SDIO power gate */
 
 static bool _uart_register_cb(wifi_at_evt_cb_t cb)
 {
@@ -57,7 +58,12 @@ static void _uart_power_on(void)
 
 static void _uart_power_down(bool disable)
 {
-    (void)disable;
+    if (disable)
+    {
+        /* 8783GBF SDIO power gate: drive WIFI_EN low + park the RF switch pins.
+         * Mirrors the enable path in wifi_power_on(); no full SDIO de-init. */
+        wifi_enable(false);
+    }
 }
 
 const wifi_transport_ops_t g_uart_transport =

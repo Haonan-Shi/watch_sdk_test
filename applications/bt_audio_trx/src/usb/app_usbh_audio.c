@@ -6,10 +6,12 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <zephyr/sys/util.h>   /* BIT() */
 #include "usbh_mgr.h"
 #include "usbh_audio_driver.h"
 #include "usb_audio1_spec.h"
 #include "trace.h"
+#include "clk_mgr.h"
 /* -------------------------------------------------------------------------
  * Stream parameters
  * -------------------------------------------------------------------------*/
@@ -63,6 +65,8 @@ static T_USBH_AUDIO_FORMAT g_active_fmt;
 static bool     g_stream_started = false;
 static uint32_t g_sine_phase     = 0;
 static uint8_t  g_pkt_fill_val   = 0;
+
+T_CLK_USER_HANDLE clk_user_usbh = NULL;
 
 static void audio_update_active_fmt(void)
 {
@@ -236,4 +240,10 @@ void app_usbh_audio_init(void)
     usbh_audio_driver_init();
     usbh_mgr_cb_register(msk, app_usbh_audio_cb);
     audio_update_active_fmt();
+    if (clk_user_usbh == NULL)
+    {
+        U_CLK_BITMAP bitmap;
+        bitmap.data = BIT(T_CLK_TYPE_CPU);
+        clk_user_usbh = clk_mgr_user_create("usbh", bitmap);
+    }
 }

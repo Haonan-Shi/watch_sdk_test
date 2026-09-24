@@ -34,6 +34,17 @@
 #include "app_spi_common.h"
 #include "app_spi_api.h"
 #include "app_spi_atcmd.h"
+#include "rtl876x_pinmux.h"     /* Pad_Config(), P0_0 */
+
+/* 8773GTP record-pen: WIFI_EN gates the external 8711's power. CHIP_EN is
+ * hardwired to 3V3 (no MCU control), unlike the 8783GBF board which drives the
+ * module's chip_en via PIN_WIFI_POWER. So here WIFI_EN is the sole software
+ * power switch for the 8711.
+ *
+ * Pin: physical P0_0 == GPIOA0. The pin_def.h pulled in on this build
+ * (platform/inc) names GPIOA0 as ADC_0 and has no P0_0 alias (that alias lives
+ * only in drivers/inc/pin_def.h), so use ADC_0 - identical pad, portable here. */
+#define WIFI_8711_WIFI_EN_PIN       ADC_0
 
 /* WIFI_8711_EVENT_SPI_* double as IO_SPI_MSG_TYPE subtypes: app_spi_msg_send()
  * posts the subtype straight through as the event id and app_spi_msg_handle()
@@ -101,6 +112,16 @@ static void wifi_8711_task(void *p_param)
                 break;
 #endif
 
+            case WIFI_8711_EVENT_USER_CB:
+                /* Deferred work posted by another module (e.g. the WiFi-connect
+                 * bring-up that powers the 8711 and waits ~2s before AT+WLCONN).
+                 * Runs on this task, so a blocking settle inside msg_cb is safe. */
+                if (msg.msg_cb != NULL)
+                {
+                    msg.msg_cb(msg.buf);
+                }
+                break;
+
             default:
                 break;
             }
@@ -135,4 +156,21 @@ void wifi_8711_init(void)
 #endif
 
     APP_PRINT_INFO0("[wifi8711] module init done");
+}
+
+void wifi_8711_power_on(void)
+{
+    APP_PRINT_INFO0("[wifi8711] power on (WIFI_EN high)");
+    /* CHIP_EN is hardwired to 3V3 on this board, so WIFI_EN is the only power
+     * gate. Just assert it; the ~2s boot settle is handled by the caller (on a
+     * task, never a BLE callback) before the first AT command. Idempotent. */
+    Pad_Config(WIFI_8711_WIFI_EN_PIN,
+               PAD_SW_MODE, PAD_IS_PWRON, PAD_PULL_UP, PAD_OUT_ENABLE, PAD_OUT_HIGH);
+}
+
+void wifi_8711_power_down(void)
+{
+    APP_PRINT_INFO0("[wifi8711] power down (WIFI_EN low)");
+    Pad_Config(WIFI_8711_WIFI_EN_PIN,
+               PAD_SW_MODE, PAD_IS_PWRON, PAD_PULL_DOWN, PAD_OUT_ENABLE, PAD_OUT_LOW);
 }

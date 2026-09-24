@@ -4,12 +4,12 @@ archives:
 - dir: bin
   archive: bin.zip
   url: https://github.com/Haonan-Shi/watch_sdk_test/releases/download/common/v1.0.0.21/bin.zip
-  sha256: 357d5fe98cf60524a4ddbd78c9f69ad35b0438644e8e3ac1d799d5eef0f96c72
-  size: 51089080
+  sha256: afede5fc465a40bd72f52a5066dea1c4ea71dcab17318feceab0959a763c4b07
+  size: 50952426
   files: 241
 - dir: tools
   archive: tools.zip
   url: https://github.com/Haonan-Shi/watch_sdk_test/releases/download/common/v1.0.0.21/tools.zip
-  sha256: 1d2d3fc8a2d60ecb2cf033b08d429084f31a0218ba15046e33f99c6e26032924
-  size: 525855069
+  sha256: f98be681ebe9cef1450a4109a8e54341e12d08fd9900cdb6631dd08f9b89a7a4
+  size: 525139576
   files: 16

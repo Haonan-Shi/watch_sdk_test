@@ -823,8 +823,6 @@ int main(void)
 
 #if F_APP_MULTI_CHANNEL_SUPPORT
         pm_cpu_freq_set(100, &actual_mhz);
-#elif F_APP_USB_HOST_SUPPORT
-        pm_cpu_freq_set(200, &actual_mhz);
 #else
         pm_cpu_freq_set(40, &actual_mhz);
 #endif

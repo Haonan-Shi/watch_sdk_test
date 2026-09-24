@@ -50,9 +50,10 @@
 extern uint8_t wifi_enable_flag;
 
 #elif F_APP_WIFI_SPI_CMD
-#include "app_spi_atcmd.h"   /* app_spi_atcmd_register_callback() */
+#include "app_spi_atcmd.h"   /* app_spi_atcmd_register_callback(), AT_EVT_MODULE_READY */
 #include "spi_file_upload.h"  /* spi_file_upload_is_ready() - SPI WiFi module guard */
 #include "app_spi_api.h"     /* SPI_XMIT_SIZE - SPI transport xfer size */
+#include "wifi_8711_app.h"   /* wifi_8711_power_on(), 8711-task deferred bring-up */
 #endif
 
 #include "app_dlps.h"
@@ -105,7 +106,7 @@ extern uint8_t wifi_enable_flag;
 
 /** @brief Preferred connection params for fast upload (units: 1.25 ms). */
 #define AI_REC_CONN_INTERVAL_MIN        0x06   /* 7.5  ms */
-#define AI_REC_CONN_INTERVAL_MAX        0x0C   /* 15   ms */
+#define AI_REC_CONN_INTERVAL_MAX        0x18   /* 30  ms */
 #define AI_REC_CONN_LATENCY             0
 #define AI_REC_CONN_SUPERVISION_TIMEOUT 500    /* 5 s */
 
@@ -116,9 +117,23 @@ extern uint8_t wifi_enable_flag;
  *  procedure may take several connection events.  We poll at this rate,
  *  checking le_get_conn_param(GAP_PARAM_CONN_INTERVAL), and only start
  *  the full-speed push once the interval settles inside the requested
- *  range.  The upload's 10 s watchdog guards against indefinite waits
- *  (e.g. phone rejects the update). */
+ *  range - or until AI_REC_CONN_UPDATE_MAX_POLLS gives up. */
 #define AI_REC_CONN_UPDATE_POLL_MS      50
+
+/** @brief Max conn-param-update polls before starting the upload anyway.
+ *
+ *  ble_set_prefer_conn_param() is only a REQUEST: this device is the
+ *  peripheral, so the central (phone) is free to reject a shorter
+ *  interval and keep whatever it likes.  That happens in practice after
+ *  the WiFi-coexistence path widens the interval to 500 ms - the phone
+ *  simply never narrows it back, so the poll above would spin forever.
+ *
+ *  A slow interval only means low throughput; it must not mean "no
+ *  transfer at all".  After this many polls (10 x 50 ms = 500 ms, ample
+ *  for a real LL update, which completes within a few connection events)
+ *  we clear the flag and stream at whatever interval the link actually
+ *  has. */
+#define AI_REC_CONN_UPDATE_MAX_POLLS    10
 
 /*============================================================================*
  *                              Types
@@ -128,6 +143,7 @@ typedef enum
 {
     AI_REC_TIMER_POLL              = 0x00,
     AI_REC_TIMER_TRANS_WATCHDOG    = 0x01,
+    AI_REC_TIMER_WIFI_READY        = 0x02,  /* 8711 "ATCMD READY" boot-banner wait */
 } T_AI_REC_TRANS_TIMER;
 
 typedef struct
@@ -226,8 +242,19 @@ typedef struct
      *  data chunks until the update settles we avoid the problematic
      *  window entirely.
      *
+     *  The wait is bounded by conn_update_polls: the central may reject
+     *  the request outright, in which case the interval never enters the
+     *  requested range and waiting for it would stall the upload forever.
+     *
      *  Zeroed in close_and_reset(). */
     bool                 conn_update_pending;
+
+    /** @brief Poll count while conn_update_pending is set.
+     *
+     *  Bounds the wait to AI_REC_CONN_UPDATE_MAX_POLLS so a central that
+     *  refuses the shorter interval degrades throughput instead of
+     *  blocking the transfer entirely.  Zeroed in close_and_reset(). */
+    uint8_t              conn_update_polls;
 
     /** @brief SPI TCP server setup progress (8773GTP only).
      *
@@ -256,19 +283,45 @@ static uint8_t ai_rec_trans_timer_id   = 0;
 static T_CLK_USER_HANDLE clk_mgr_upload_handle = NULL;
 
 #if F_APP_WIFI_UART_CMD
-/* The module is powered on the first connect and then left on, so the cold
- * bring-up is only paid once. wifi_pending_connect_param holds the
- * "<ssid>,<password>" AT payload until the WiFi task finishes bring-up and
- * issues the deferred ATPN. */
-static bool    wifi_powered_on         = false;
+/* 8783GBF SDIO. Module powered by CMD_WIFI_POWER_ON, left on until CMD_WIFI_POWER_OFF.
+ *  wifi_powered_on      - module powered AND "COMMAND READY" banner seen (set in
+ *                         ai_rec_trans_wifi_power_on_finish). CMD_WIFI_CONNECT then
+ *                         goes straight to ATPN; otherwise it returns 0x17.
+ *  wifi_pwr_on_pending  - a CMD_WIFI_POWER_ON bring-up is in flight.
+ *  wifi_pending_connect_param - "<ssid>,<password>" ATPN payload, handed to the
+ *                         main-app-task deferred sender (ATPN must NOT be sent from
+ *                         the WiFi task - see ai_rec_trans_wifi_send_connect_deferred). */
+static bool    wifi_powered_on      = false;
+static bool    wifi_pwr_on_pending  = false;
 static char    wifi_pending_connect_param[AI_REC_WIFI_SSID_MAX + AI_REC_WIFI_PASS_MAX + 4];
+#define AI_REC_WIFI_INTERFACE       WIFI_IF_SDIO_8783
+#elif F_APP_WIFI_SPI_CMD
+/* 8773GTP + 8711 (SPI). WIFI_EN (P0_0/GPIOA0) driven high by CMD_WIFI_POWER_ON,
+ * left on until CMD_WIFI_POWER_OFF.
+ *  wifi_powered_on     - module powered AND its "ATCMD READY" boot banner seen,
+ *                        i.e. the AT engine can accept commands. Set in
+ *                        ai_rec_trans_wifi_power_on_finish(). CMD_WIFI_CONNECT then
+ *                        sends AT+WLCONN directly; otherwise it returns 0x17.
+ *  wifi_pwr_on_pending - a CMD_WIFI_POWER_ON bring-up is in flight (WIFI_EN high,
+ *                        waiting for "ATCMD READY"). */
+static bool    wifi_powered_on          = false;
+static bool    wifi_pwr_on_pending      = false;
+static bool    wifi_spi_auto_connected  = false;   /* module auto-joined saved AP at power-on */
+static uint8_t timer_id_wifi_ready       = 0;
+#define AI_REC_WIFI_INTERFACE       WIFI_IF_SPI_8711
+/* Max wait for the 8711's "ATCMD READY" banner after WIFI_EN goes high. Boot-to-
+ * ready varies a lot per unit: ~7.2s (COM62 2026-08-31) but ~12.04s on another
+ * unit (COM62 2026-09-03) - which JUST missed a 12000ms window. Use 20000ms so a
+ * slow boot is not falsely timed out. A late banner past this is still latched by
+ * the AT_EVT_MODULE_READY handler so CMD_WIFI_CONNECT won't wrongly return 0x17. */
+#define AI_REC_WIFI_8711_READY_TIMEOUT_MS   20000
 #endif
 
 /*============================================================================*
  *                              Forward decls
  *============================================================================*/
 
-static void ai_rec_trans_send_notify_raw(uint16_t evt_id,
+static bool ai_rec_trans_send_notify_raw(uint16_t evt_id,
                                          const uint8_t *data, uint16_t data_len);
 static void ai_rec_trans_send_simple_resp(uint16_t evt_id, uint8_t result);
 static void ai_rec_trans_send_upload_error(T_AI_REC_UPLOAD_ERR err);
@@ -279,8 +332,20 @@ static void ai_rec_trans_disarm_watchdog(void);
 static void ai_rec_trans_arm_timer_ms(uint32_t interval_ms);
 static bool ai_rec_live_reopen_refresh(void);
 static void ai_rec_trans_send_batch(void);
+static void ai_rec_trans_scan_pump(void);
 static void ai_rec_trans_timeout_cb(uint8_t timer_evt, uint16_t param);
 static void ai_rec_trans_handle_event_ack(uint8_t *p, uint16_t plen);
+#if (F_APP_WIFI_UART_CMD || F_APP_WIFI_SPI_CMD)
+static void ai_rec_trans_wifi_power_on_finish(bool ready);
+static void ai_rec_trans_send_wifi_power_on_evt(uint8_t result, uint8_t interface);
+static void ai_rec_trans_send_wifi_power_off_evt(uint8_t result);
+static void ai_rec_trans_restore_ble_conn_interval(void);
+#endif
+#if F_APP_WIFI_SPI_CMD
+static void ai_rec_trans_wifi_spi_ready_timeout_fire(void *p_arg);
+static void ai_rec_trans_spi_start_tcp_server(void);
+static void ai_rec_trans_spi_reuse_autoconn_cb(void *p_arg);
+#endif
 
 /* Externally visible - called from app_ble_service when a GATT
  * notification send completes for the record-trans service. */
@@ -526,7 +591,7 @@ static uint16_t ai_rec_trans_get_mtu(void)
  *
  *         LEN = op_code(2) + body_len.
  */
-static void ai_rec_trans_send_notify_raw(uint16_t op_code,
+static bool ai_rec_trans_send_notify_raw(uint16_t op_code,
                                          const uint8_t *body, uint16_t body_len)
 {
     uint16_t length = (uint16_t)(PKT_OP_CODE_LEN + body_len);   /* "LENGTH" field value */
@@ -536,7 +601,7 @@ static void ai_rec_trans_send_notify_raw(uint16_t op_code,
     if (buf == NULL)
     {
         APP_PRINT_ERROR1("send_notify_raw: malloc fail, len=%d", total);
-        return;
+        return false;
     }
 
     /* Outer header */
@@ -555,9 +620,10 @@ static void ai_rec_trans_send_notify_raw(uint16_t op_code,
         memcpy(buf + AI_REC_NOTIFY_HDR_LEN, body, body_len);
     }
 
-    record_trans_service_send_notification(ai_rec_trans.conn_handle, ai_rec_trans.cid,
-                                           buf, total);
+    bool ok = record_trans_service_send_notification(ai_rec_trans.conn_handle,
+                                                     ai_rec_trans.cid, buf, total);
     free(buf);
+    return ok;
 }
 
 /** @brief [evt_id(2)][result(1)] for auxiliary cmds. */
@@ -605,8 +671,9 @@ static void ai_rec_trans_send_upload_start(uint16_t crc, uint32_t total_len,
  *
  *  CMD_SCAN_FILES walks the FS directly (not Header.bin) so it can be
  *  used for initial discovery / list rebuild. Two-pass over
- *  app_fs_if_list_files: pass 1 counts matches for the Start frame,
- *  pass 2 emits up to batch_cap entries before the End frame.
+ *  app_fs_if_list_files: pass 1 counts matches for the Start frame, then the
+ *  credit-gated pump emits ALL matched entries before the End frame (batch_cap
+ *  is advisory only - delivery is paced by LE credits, not truncated).
  *============================================================================*/
 
 /* Forward decl: ai_rec_format_from_name is defined later in this file. */
@@ -641,7 +708,7 @@ static const char *ai_rec_scan_filter_to_ext(uint8_t filter_type)
 }
 
 /** @brief EVT_SCAN_FILES Flag=0x00 start frame. Body: [flag][total(4)]. */
-static void ai_rec_trans_send_scan_start(uint32_t total)
+static bool ai_rec_trans_send_scan_start(uint32_t total)
 {
     uint8_t body[5];
     body[0] = (uint8_t)SCAN_FLAG_START;
@@ -649,11 +716,11 @@ static void ai_rec_trans_send_scan_start(uint32_t total)
     body[2] = (uint8_t)((total >> 8) & 0xFF);
     body[3] = (uint8_t)((total >> 16) & 0xFF);
     body[4] = (uint8_t)((total >> 24) & 0xFF);
-    ai_rec_trans_send_notify_raw(EVT_SCAN_FILES, body, sizeof(body));
+    return ai_rec_trans_send_notify_raw(EVT_SCAN_FILES, body, sizeof(body));
 }
 
 /** @brief EVT_SCAN_FILES Flag=0x02 end frame. Body: [flag][delivered(4)]. */
-static void ai_rec_trans_send_scan_end(uint32_t delivered)
+static bool ai_rec_trans_send_scan_end(uint32_t delivered)
 {
     uint8_t body[5];
     body[0] = (uint8_t)SCAN_FLAG_END;
@@ -661,7 +728,7 @@ static void ai_rec_trans_send_scan_end(uint32_t delivered)
     body[2] = (uint8_t)((delivered >> 8) & 0xFF);
     body[3] = (uint8_t)((delivered >> 16) & 0xFF);
     body[4] = (uint8_t)((delivered >> 24) & 0xFF);
-    ai_rec_trans_send_notify_raw(EVT_SCAN_FILES, body, sizeof(body));
+    return ai_rec_trans_send_notify_raw(EVT_SCAN_FILES, body, sizeof(body));
 }
 
 /** @brief EVT_SCAN_FILES Flag=0xFE error frame. */
@@ -685,7 +752,7 @@ static void ai_rec_trans_send_scan_error(T_AI_REC_SCAN_ERR err)
  *  until the FS layer exposes per-file timestamps and we choose to
  *  pre-compute file CRCs at scan cost.
  */
-static void ai_rec_trans_send_scan_entry(uint16_t idx, uint8_t format,
+static bool ai_rec_trans_send_scan_entry(uint16_t idx, uint8_t format,
                                          uint8_t storage, uint32_t size,
                                          uint32_t modify_ts, uint16_t crc16,
                                          const char *filename)
@@ -701,7 +768,7 @@ static void ai_rec_trans_send_scan_entry(uint16_t idx, uint8_t format,
     if (body == NULL)
     {
         APP_PRINT_ERROR1("scan_entry: malloc fail len=%d", body_len);
-        return;
+        return false;
     }
 
     uint8_t *q = body;
@@ -724,8 +791,9 @@ static void ai_rec_trans_send_scan_entry(uint16_t idx, uint8_t format,
     *q++ = (uint8_t)((name_len >> 8) & 0xFF);
     memcpy(q, filename, name_len);
 
-    ai_rec_trans_send_notify_raw(EVT_SCAN_FILES, body, body_len);
+    bool ret = ai_rec_trans_send_notify_raw(EVT_SCAN_FILES, body, body_len);
     free(body);
+    return ret;
 }
 
 /* Two-pass scan contexts. */
@@ -737,11 +805,26 @@ typedef struct
 
 typedef struct
 {
-    uint16_t cur_idx;
-    uint16_t max_emit;
-    uint32_t emitted;
+    uint32_t skip;          /* leading matches to skip (already delivered) */
+    uint32_t seen;          /* matches walked so far this pass */
+    uint16_t cur_idx;       /* absolute index for the next entry */
+    uint16_t max_emit;      /* entries to emit this pass */
+    uint32_t emitted;       /* entries emitted this pass */
     uint8_t  storage_byte;  /* placed in each entry's storage field */
+    bool     send_failed;   /* set when a notify failed (GATT tx full) */
 } T_AI_REC_SCAN_EMIT_CTX;
+
+/* Async, credit-gated scan session (see ai_rec_trans_scan_pump). Mutually
+ * exclusive with a file upload - both share the Notify channel + LE credits. */
+static struct
+{
+    bool        active;
+    bool        start_sent;
+    const char *ext;        /* string literal from filter_to_ext (stable), NULL=ALL */
+    uint32_t    total;      /* pass-1 count, reported in START */
+    uint16_t    cap;        /* entries to deliver == total match count (== total) */
+    uint16_t    emitted;    /* entries delivered so far */
+} s_scan;
 
 static bool ai_rec_scan_count_cb(const char *filename, uint32_t filesize, void *ctx)
 {
@@ -755,15 +838,26 @@ static bool ai_rec_scan_count_cb(const char *filename, uint32_t filesize, void *
 static bool ai_rec_scan_emit_cb(const char *filename, uint32_t filesize, void *ctx)
 {
     T_AI_REC_SCAN_EMIT_CTX *c = (T_AI_REC_SCAN_EMIT_CTX *)ctx;
+
+    /* Skip entries already delivered by earlier pump passes. */
+    if (c->seen++ < c->skip)
+    {
+        return true;
+    }
     if (c->emitted >= c->max_emit)
     {
-        return false;  /* tell list_files to stop */
+        return false;  /* this pass full - stop walking */
     }
     uint8_t fmt = (uint8_t)ai_rec_format_from_name(filename);
-    ai_rec_trans_send_scan_entry(c->cur_idx, fmt, c->storage_byte,
-                                 filesize, 0 /* ts unknown */,
-                                 0 /* crc16 not pre-computed */,
-                                 filename);
+    if (!ai_rec_trans_send_scan_entry(c->cur_idx, fmt, c->storage_byte,
+                                      filesize, 0 /* ts unknown */,
+                                      0 /* crc16 not pre-computed */,
+                                      filename))
+    {
+        /* GATT tx full: stop; this idx is retried on the next pump. */
+        c->send_failed = true;
+        return false;
+    }
     c->cur_idx++;
     c->emitted++;
     return true;
@@ -772,13 +866,28 @@ static bool ai_rec_scan_emit_cb(const char *filename, uint32_t filesize, void *c
 /**
  * @brief CMD_SCAN_FILES handler.
  *
- *  Sequence: pass1 (count) => start frame => pass2 (emit <= batch_cap) => end.
- *  Errors short-circuit with a single Flag=0xFE frame; no start/end pair.
+ *  Report format is unchanged (START / ENTRY x N / END). Instead of emitting
+ *  every frame synchronously in this handler (which could exceed the LE TX
+ *  credit pool and silently drop notifications), it builds an async scan
+ *  session and kicks the credit-gated pump. The pump (ai_rec_trans_scan_pump)
+ *  emits as many frames as there are credits and is driven forward by each
+ *  PROFILE_EVT_SEND_DATA_COMPLETE, so no packets are dropped regardless of the
+ *  batch size.
  */
 static void ai_rec_trans_handle_scan_files(uint8_t *p, uint16_t plen)
 {
     if (plen < 3)
     {
+        ai_rec_trans_send_scan_error(SCAN_ERR_PERMISSION_DENIED);
+        return;
+    }
+
+    /* Mutually exclusive with an upload and with another in-flight scan:
+     * they share the same Notify channel and LE credit pool. */
+    if (ai_rec_trans.state != AI_REC_TRANS_IDLE || s_scan.active)
+    {
+        APP_PRINT_WARN2("scan_files: busy (state=%d scan=%d)",
+                        ai_rec_trans.state, s_scan.active);
         ai_rec_trans_send_scan_error(SCAN_ERR_PERMISSION_DENIED);
         return;
     }
@@ -802,41 +911,120 @@ static void ai_rec_trans_handle_scan_files(uint8_t *p, uint16_t plen)
         return;
     }
 
-    /* filter_type==0 (ALL) => ext=NULL => list_files iterates all files */
+    /* filter_type==0xFF (ALL) or unsupported => ext=NULL => iterate all files */
     const char *ext = ai_rec_scan_filter_to_ext(filter_type);
 
-    /* ---- Pass 1: count total matches ---- */
+    /* ---- Pass 1: count total matches (for the START frame) ---- */
     T_AI_REC_SCAN_COUNT_CTX ccnt = {0};
     app_fs_if_list_files(ext, ai_rec_scan_count_cb, &ccnt);
 
-    ai_rec_trans_send_scan_start(ccnt.count);
-
-    /* ---- Pass 2: emit up to batch_cap entries ---- */
-    uint16_t cap = batch_cap;
-    if (cap == 0)
+    /* Fix A (credits flow-control): batch_cap must NOT truncate the listing.
+     * The credit-gated pump (ai_rec_trans_scan_pump) already paces every frame
+     * to the LE TX credit pool, so we deliver the ENTIRE match set in one scan
+     * instead of stopping early at batch_cap. The host validates START.total
+     * against END.delivered, so both are derived from the same n_deliver value
+     * to keep that invariant even when the count is clamped. batch_cap stays in
+     * the protocol but is advisory only - it no longer bounds the delivery. */
+    (void)batch_cap;
+    uint32_t n_deliver = ccnt.count;
+    if (n_deliver > AI_REC_SCAN_MAX_BATCH)
     {
-        cap = AI_REC_SCAN_DEFAULT_BATCH;
+        /* Safety clamp against the 16-bit entry-index wire field. START.total
+         * is set to the same clamped value below so total==delivered holds. */
+        n_deliver = AI_REC_SCAN_MAX_BATCH;
     }
-    if (cap > AI_REC_SCAN_MAX_BATCH)
+    uint16_t cap = (uint16_t)n_deliver;
+
+    /* ---- Build the credit-gated scan session and kick the pump ---- */
+    memset(&s_scan, 0, sizeof(s_scan));
+    s_scan.active     = true;
+    s_scan.start_sent = false;
+    s_scan.ext        = ext;
+    s_scan.total      = n_deliver;   /* == cap => START.total == END.delivered */
+    s_scan.cap        = cap;
+    s_scan.emitted    = 0;
+
+    /* Arm the watchdog now (not only after START) so a session that cannot
+     * even send START - e.g. zero credits at this instant, hence no
+     * SEND_DATA_COMPLETE to pump it - is still released on timeout. */
+    ai_rec_trans_arm_watchdog();
+    ai_rec_trans_scan_pump();
+}
+
+/**
+ * @brief Credit-gated pump for EVT_SCAN_FILES (START / ENTRY x N / END).
+ *
+ *  Emits as many frames as there are LE TX credits, then returns. Re-invoked
+ *  from ai_rec_trans_notify_send_complete() on every SEND_DATA_COMPLETE (which
+ *  replenishes one credit) until the whole batch is delivered. Each send is
+ *  checked; on tx-full the position is kept and retried on the next pump, so
+ *  no frame is ever dropped.
+ */
+static void ai_rec_trans_scan_pump(void)
+{
+    if (!s_scan.active)
     {
-        cap = AI_REC_SCAN_MAX_BATCH;
-    }
-    if ((uint32_t)cap > ccnt.count)
-    {
-        cap = (uint16_t)ccnt.count;
+        return;
     }
 
-    T_AI_REC_SCAN_EMIT_CTX cemit = {0};
-    cemit.cur_idx      = 0;
-    cemit.max_emit     = cap;
-    cemit.storage_byte = (uint8_t)SCAN_STORAGE_SD;
+    uint8_t credits = 0;
+    le_get_gap_param(GAP_PARAM_LE_REMAIN_CREDITS, &credits);
 
-    if (cap > 0)
+    /* START (Flag=0x00) - one credit. */
+    if (!s_scan.start_sent)
     {
-        app_fs_if_list_files(ext, ai_rec_scan_emit_cb, &cemit);
+        if (credits == 0)
+        {
+            return;                 /* retry on next SEND_DATA_COMPLETE */
+        }
+        if (!ai_rec_trans_send_scan_start(s_scan.total))
+        {
+            return;                 /* tx full - retry next pump */
+        }
+        s_scan.start_sent = true;
+        credits--;
+        ai_rec_trans_arm_watchdog();
     }
 
-    ai_rec_trans_send_scan_end(cemit.emitted);
+    /* ENTRY (Flag=0x01) - emit up to 'credits' entries this pass. */
+    if (s_scan.emitted < s_scan.cap && credits > 0)
+    {
+        uint16_t want = (uint16_t)(s_scan.cap - s_scan.emitted);
+        if (want > credits)
+        {
+            want = credits;
+        }
+        T_AI_REC_SCAN_EMIT_CTX cemit = {0};
+        cemit.skip         = s_scan.emitted;   /* skip already-delivered */
+        cemit.cur_idx      = s_scan.emitted;   /* absolute idx */
+        cemit.max_emit     = want;
+        cemit.storage_byte = (uint8_t)SCAN_STORAGE_SD;
+
+        app_fs_if_list_files(s_scan.ext, ai_rec_scan_emit_cb, &cemit);
+
+        s_scan.emitted = (uint16_t)(s_scan.emitted + cemit.emitted);
+        credits        = (uint8_t)(credits - cemit.emitted);
+
+        if (cemit.send_failed)
+        {
+            return;                 /* tx full mid-pass - wait for next pump */
+        }
+    }
+
+    /* END (Flag=0x02) - all entries delivered. */
+    if (s_scan.emitted >= s_scan.cap)
+    {
+        if (credits == 0)
+        {
+            return;                 /* no credit for END now - next pump */
+        }
+        if (!ai_rec_trans_send_scan_end(s_scan.emitted))
+        {
+            return;                 /* tx full - retry next pump */
+        }
+        s_scan.active = false;
+        ai_rec_trans_disarm_watchdog();
+    }
 }
 
 /*============================================================================*
@@ -1045,19 +1233,99 @@ static void ai_rec_trans_send_wifi_disconnect_evt(uint8_t result)
     ai_rec_trans_send_notify_raw(EVT_WIFI_DISCONNECT, &result, 1);
 }
 
+/** @brief Send EVT_WIFI_POWER_ON (spec x7.2, 4B body: result, interface, init, rsv). */
+static void ai_rec_trans_send_wifi_power_on_evt(uint8_t result, uint8_t interface)
+{
+    uint8_t body[4] = {0};
+    body[0] = result;
+    if (result == WIFI_RESULT_SUCCESS || result == WIFI_RESULT_ALREADY_CONNECTED)
+    {
+        body[1] = interface;   /* Byte2 init-time left 0 (not measured) */
+    }
+    ai_rec_trans_send_notify_raw(EVT_WIFI_POWER_ON, body, sizeof(body));
+}
+
+/** @brief Send EVT_WIFI_POWER_OFF (spec x7.5, 1B body: result). */
+static void ai_rec_trans_send_wifi_power_off_evt(uint8_t result)
+{
+    APP_PRINT_INFO1("wifi_power_off: send EVT_WIFI_POWER_OFF result=0x%02x", result);
+    ai_rec_trans_send_notify_raw(EVT_WIFI_POWER_OFF, &result, 1);
+}
+
+/**
+ * @brief Terminal step of a CMD_WIFI_POWER_ON bring-up (both transports).
+ *
+ *  Called once the module signals ready (SPI "ATCMD READY" / SDIO "COMMAND
+ *  READY") or the ready wait times out. Guarded by wifi_pwr_on_pending so a
+ *  ready-vs-timeout race resolves to a single EVT. On success latches
+ *  wifi_powered_on so later CMD_WIFI_CONNECT skip the bring-up; on timeout leaves
+ *  the module un-ready (0x13) - the phone recovers with POWER_OFF + POWER_ON,
+ *  which power-cycles the module and re-emits the boot banner.
+ */
+#if (F_APP_WIFI_UART_CMD || F_APP_WIFI_SPI_CMD)
+static void ai_rec_trans_wifi_power_on_finish(bool ready)
+{
+    if (!wifi_pwr_on_pending)
+    {
+        return;   /* ready and timeout can both land; first one wins */
+    }
+    wifi_pwr_on_pending = false;
+#if F_APP_WIFI_SPI_CMD
+    app_stop_timer(&timer_id_wifi_ready);
+#endif
+
+    if (ready)
+    {
+        wifi_powered_on = true;
+        ai_rec_trans.wifi_state = WIFI_STATE_DISCONNECTED;   /* 已上电、未连线 */
+        ai_rec_trans_send_wifi_power_on_evt(WIFI_RESULT_SUCCESS, AI_REC_WIFI_INTERFACE);
+        APP_PRINT_INFO0("wifi_power_on: module ready, EVT success");
+    }
+    else
+    {
+        wifi_powered_on = false;
+        ai_rec_trans.wifi_state = WIFI_STATE_POWERED_OFF;
+        ai_rec_trans_send_wifi_power_on_evt(WIFI_RESULT_TIMEOUT, WIFI_IF_UNKNOWN);
+        APP_PRINT_WARN0("wifi_power_on: ready banner timeout, EVT 0x13");
+    }
+    /* Power-on lifecycle done - restore DLPS (dispatcher skipped it while POWERING). */
+    app_dlps_enable(APP_DLPS_ENTER_CHECK_INIT);
+}
+#endif /* F_APP_WIFI_UART_CMD || F_APP_WIFI_SPI_CMD */
+
 /**
  * @brief Send EVT_WIFI_GET_STATUS. Body length depends on state:
  *
  *    Connected:    state(1) + ssid_len(1) + ssid(N) + ip(4 BE) + rssi(1)
  *    Other states: state(1) + ssid_len=0(1) + ip(4 BE, all 0) + rssi(1, 0)
  */
+/** @brief Map internal wifi_state to the spec's EVT_WIFI_GET_STATUS wire value.
+ *         Internal ATPS/ATPI_PENDING (0x05/0x06) and POWERING_ON/POWERED_OFF
+ *         (0x07/0x08) must NOT leak to the wire (spec 0x05 == powered off). */
+static uint8_t ai_rec_wifi_state_to_wire(T_AI_REC_WIFI_STATE s)
+{
+    switch (s)
+    {
+    case WIFI_STATE_CONNECTED:      return 0x02;
+    case WIFI_STATE_CONNECTING:
+    case WIFI_STATE_ATPS_PENDING:
+    case WIFI_STATE_ATPI_PENDING:   return 0x01;   /* all "connecting" to the host */
+    case WIFI_STATE_DISCONNECTING:  return 0x03;
+    case WIFI_STATE_FAIL:           return 0x04;
+    case WIFI_STATE_POWERED_OFF:
+    case WIFI_STATE_POWERING_ON:    return 0x05;   /* not yet ready -> powered off */
+    case WIFI_STATE_DISCONNECTED:
+    default:                        return 0x00;   /* powered, not connected */
+    }
+}
+
 static void ai_rec_trans_send_wifi_status_evt(void)
 {
     uint8_t  body[1 + 1 + AI_REC_WIFI_SSID_MAX + 4 + 1];
     uint8_t *q = body;
     bool     connected = (ai_rec_trans.wifi_state == WIFI_STATE_CONNECTED);
 
-    *q++ = (uint8_t)ai_rec_trans.wifi_state;
+    *q++ = ai_rec_wifi_state_to_wire(ai_rec_trans.wifi_state);
 
     if (connected)
     {
@@ -1214,26 +1482,11 @@ static void ai_rec_trans_wifi_atcmd_cb(T_AT_EVT_TYPE evt, void *p_data,
             ai_rec_trans.wifi_connect_pending = false;
             ai_rec_trans.wifi_ip = ip_host;
             ai_rec_trans.wifi_rssi = 0;
-            ai_rec_trans.spi_tcp_setup_step = 0;
 
-            /* Queue TCP server setup via raw AT commands.  The AT engine
-             * processes them sequentially after the current WLCONN command
-             * finishes.  Both are queued before the OK from WLCONN has been
-             * fully processed, so they execute in order: WLCONN -> SKTCFG ->
-             * SKTSERVER.  spi_tcp_setup_step tracks completion: step 0 is
-             * SKTCFG OK, step 1 is SKTSERVER OK, step 2 means ready. */
-            {
-                const wifi_transport_ops_t *tport = wifi_transport_get();
-                if (tport)
-                {
-                    char cmd_line[48];
-                    tport->queue_fill(ATCMD_RAW, "AT+SKTCFG=,,1\r\n");
-                    snprintf(cmd_line, sizeof(cmd_line),
-                             "AT+SKTSERVER=0,1,,%u,1\r\n", (unsigned int)AI_REC_WIFI_TCP_PORT);
-                    tport->queue_fill(ATCMD_RAW, cmd_line);
-                    tport->trigger_send();
-                }
-            }
+            /* Queue TCP server setup (SKTCFG -> SKTSERVER). spi_tcp_setup_step
+             * tracks completion; at step 2 the CMD_RESPONSE handler sends
+             * EVT_WIFI_CONNECT. */
+            ai_rec_trans_spi_start_tcp_server();
 #else
             ai_rec_trans_wifi_on_link_up(ip_host);
 #endif
@@ -1253,6 +1506,30 @@ static void ai_rec_trans_wifi_atcmd_cb(T_AT_EVT_TYPE evt, void *p_data,
                                 ai_rec_trans.wifi_ip);
             }
         }
+#if F_APP_WIFI_SPI_CMD
+        else if (wifi_powered_on &&
+                 ai_rec_trans.wifi_state == WIFI_STATE_DISCONNECTED)
+        {
+            /* Auto-connect: the 8711 joined its saved AP after power-on WITHOUT an
+             * app CMD_WIFI_CONNECT (so state is powered-idle, not CONNECTING). Cache
+             * the IP and flag it. A later CMD_WIFI_CONNECT then skips WLCONN (the
+             * module won't re-emit GOT_IP for an already-joined AP, which would
+             * stall the connect) and jumps straight to TCP-server setup with this
+             * cached IP. See ai_rec_trans_handle_wifi_connect(). */
+            uint32_t ip_host = 0;
+            if (p_data)
+            {
+                T_AT_IP_ADDR *ip = (T_AT_IP_ADDR *)p_data;
+                ip_host = ((uint32_t)ip->octets[0] << 24) |
+                          ((uint32_t)ip->octets[1] << 16) |
+                          ((uint32_t)ip->octets[2] << 8) |
+                          ((uint32_t)ip->octets[3]);
+            }
+            ai_rec_trans.wifi_ip    = ip_host;
+            wifi_spi_auto_connected = true;
+            APP_PRINT_INFO1("wifi_atcmd_cb: SPI auto-connect captured, ip=0x%08x", ip_host);
+        }
+#endif
         break;
 
     case AT_EVT_WIFI_CONNECTED:
@@ -1263,7 +1540,38 @@ static void ai_rec_trans_wifi_atcmd_cb(T_AT_EVT_TYPE evt, void *p_data,
                         ai_rec_trans.wifi_state);
         break;
 
+#if F_APP_WIFI_SPI_CMD
+    case AT_EVT_MODULE_READY:
+        /* 8711 finished booting and announced "ATCMD READY" over SPI - the module
+         * is now ready to accept AT commands. This completes a CMD_WIFI_POWER_ON
+         * bring-up (EVT_WIFI_POWER_ON success). Runs on the wifi_8711 task (same
+         * context that parses the banner), so the notify send is legal here. */
+        APP_PRINT_INFO0("wifi_atcmd_cb: AT_EVT_MODULE_READY (ATCMD READY)");
+        if (wifi_pwr_on_pending)
+        {
+            ai_rec_trans_wifi_power_on_finish(true);
+        }
+        else if (!wifi_powered_on)
+        {
+            /* Late banner: the ready-timeout already fired (EVT 0x13 sent) but the
+             * module is actually up now. Latch it so a subsequent CMD_WIFI_CONNECT
+             * is not wrongly rejected with 0x17 - the phone either retries
+             * CMD_WIFI_POWER_ON (gets 0x15) or its CONNECT just works. */
+            wifi_powered_on = true;
+            if (ai_rec_trans.wifi_state == WIFI_STATE_POWERED_OFF)
+            {
+                ai_rec_trans.wifi_state = WIFI_STATE_DISCONNECTED;
+            }
+            APP_PRINT_WARN0("wifi_atcmd_cb: late ATCMD READY after timeout, latched powered_on");
+        }
+        break;
+#endif
+
     case AT_EVT_WIFI_DISCONNECTED:
+#if F_APP_WIFI_SPI_CMD
+        /* Any disconnect invalidates a captured auto-connection. */
+        wifi_spi_auto_connected = false;
+#endif
         if (ai_rec_trans.wifi_state == WIFI_STATE_DISCONNECTING ||
             ai_rec_trans.wifi_state == WIFI_STATE_CONNECTED)
         {
@@ -1286,12 +1594,20 @@ static void ai_rec_trans_wifi_atcmd_cb(T_AT_EVT_TYPE evt, void *p_data,
             /* CMD_WIFI_DISCONNECT (or unsolicited disconnect while
              * connected) completed - safe to re-enable DLPS. */
             app_dlps_enable(APP_DLPS_ENTER_CHECK_INIT);
-            /* WiFi link is down - restore CPU+SPIC0 to normal frequency. */
+            /* WiFi link is down - restore CPU+SPIC0 to normal frequency, and
+             * deinit the file-upload module so its s_inited/s_state/open fs_handle
+             * don't leak into the next connect (else a re-connect skips re-init and
+             * a stale UPLOADING state rejects the next upload as busy). */
 #if F_APP_WIFI_SPI_CMD
             spi_file_upload_restore_clk();
+            spi_file_upload_deinit();
 #elif F_APP_WIFI_UART_CMD
             wifi_file_upload_restore_clk();
+            wifi_file_upload_deinit();
 #endif
+            /* WiFi link that widened the BLE interval to 500ms is gone - restore
+             * the fast interval so BLE control latency drops back to normal. */
+            ai_rec_trans_restore_ble_conn_interval();
         }
         else if (ai_rec_trans.wifi_state == WIFI_STATE_CONNECTING ||
                  ai_rec_trans.wifi_state == WIFI_STATE_ATPS_PENDING ||
@@ -1374,12 +1690,16 @@ static void ai_rec_trans_wifi_atcmd_cb(T_AT_EVT_TYPE evt, void *p_data,
                 ai_rec_trans_send_wifi_disconnect_evt(WIFI_RESULT_SUCCESS);
                 /* Disconnect completed - re-enable DLPS. */
                 app_dlps_enable(APP_DLPS_ENTER_CHECK_INIT);
-                /* WiFi link is down - restore CPU+SPIC0 to normal frequency. */
+                /* WiFi link is down - restore CPU+SPIC0 and deinit the upload
+                 * module (see the DISCONNECTED branch above for rationale). */
 #if F_APP_WIFI_SPI_CMD
                 spi_file_upload_restore_clk();
+                spi_file_upload_deinit();
 #elif F_APP_WIFI_UART_CMD
                 wifi_file_upload_restore_clk();
+                wifi_file_upload_deinit();
 #endif
+                ai_rec_trans_restore_ble_conn_interval();
             }
         }
 #if F_APP_WIFI_SPI_CMD
@@ -1413,7 +1733,7 @@ static void ai_rec_trans_wifi_atcmd_cb(T_AT_EVT_TYPE evt, void *p_data,
                     .song_format_type  = 0x0F,
                     .transport_cap     = 0x07,
                     .tcp_port          = AI_REC_WIFI_TCP_PORT,
-                    .sd_mount          = "/SD:/audio",
+                    .sd_mount          = FATFS_ROOT_PATH "/audio",
                 };
                 spi_file_upload_init(&upload_cfg);
 
@@ -1468,7 +1788,7 @@ static void ai_rec_trans_wifi_atcmd_cb(T_AT_EVT_TYPE evt, void *p_data,
                     .song_format_type  = 0x0F,            /* AAC|MP3|FLAC|WAV */
                     .transport_cap     = 0x07,            /* BLE|SPP|WiFi */
                     .tcp_port          = AI_REC_WIFI_TCP_PORT,
-                    .sd_mount          = "/SD:/audio",
+                    .sd_mount          = FATFS_ROOT_PATH "/audio",
                 };
                 wifi_file_upload_init(&upload_cfg);
             }
@@ -1560,22 +1880,20 @@ static bool ai_rec_trans_wifi_send_connect_cmd(const char *param)
 #define AI_REC_WIFI_READY_POLL_MS           50
 
 /**
- * @brief Cold-start bring-up, executed on the WiFi task.
+ * @brief CMD_WIFI_POWER_ON bring-up, executed on the WiFi task.
  *
- *  Posted by the connect handler (see ai_rec_trans_handle_wifi_connect) so the
- *  multi-second module power-on never blocks the BLE/GATT callback. Mirrors the
- *  proven CMD_AI_RECORD_WIFI_POWER_ON (0x8401) sequence:
+ *  Posted by ai_rec_trans_handle_wifi_power_on() so the multi-second module
+ *  power-on never blocks the BLE/GATT callback. Mirrors the proven
+ *  CMD_AI_RECORD_WIFI_POWER_ON (0x8401) sequence:
  *    - wifi_power_on(): chip_en timing (~2.2s) + RF switch + SDIO + upload port,
- *    - wifi_enable_flag = 1: open the UART RX gate so AT responses reach the
- *      parser (otherwise they are dropped as "unknown uart_mode"),
- *    - wait for the module's "COMMAND READY" boot banner (with a fallback
- *      timeout), then a short settle, so the first AT command is not raced
- *      against module bring-up (see AI_REC_WIFI_READY_TIMEOUT_MS),
- *  then issues the deferred ATPN connect - unless a disconnect arrived during
- *  bring-up and moved us out of CONNECTING, in which case the stale connect is
- *  dropped. Runs in the same task that drives the AT send/parse flow, so the
- *  queue_fill / EVT-notify calls here follow the established threading model. */
-static void ai_rec_trans_wifi_bringup_connect(void *p_msg)
+ *    - wifi_enable_flag = 1: open the UART RX gate so module output (incl. the
+ *      "COMMAND READY" banner) reaches the parser,
+ *    - wait for the "COMMAND READY" banner (fallback timeout), then a short
+ *      settle so the first AT command later is not raced against bring-up.
+ *  Ends by calling ai_rec_trans_wifi_power_on_finish(ready), which emits
+ *  EVT_WIFI_POWER_ON. Sending the notify from this task is fine (BLE notify is
+ *  not the AT-TX-to-module path that has the WiFi-task context restriction). */
+static void ai_rec_trans_wifi_power_on_task(void *p_msg)
 {
     (void)p_msg;
 
@@ -1586,63 +1904,28 @@ static void ai_rec_trans_wifi_bringup_connect(void *p_msg)
     wifi_power_on();
     wifi_enable_flag = 1;
 
-    /* Wait for the module's "COMMAND READY" banner instead of a blind delay:
-     * the banner proves the module finished booting and the UART link is alive.
-     * Poll with a fallback timeout so a missed/garbled banner never wedges us. */
+    uint32_t waited = 0;
+    while (!app_wifi_uart_module_is_ready() &&
+           waited < AI_REC_WIFI_READY_TIMEOUT_MS)
     {
-        uint32_t waited = 0;
-        while (!app_wifi_uart_module_is_ready() &&
-               waited < AI_REC_WIFI_READY_TIMEOUT_MS)
-        {
-            os_delay(AI_REC_WIFI_READY_POLL_MS);
-            waited += AI_REC_WIFI_READY_POLL_MS;
-        }
-        if (app_wifi_uart_module_is_ready())
-        {
-            APP_PRINT_INFO1("wifi_connect: module COMMAND READY after %d ms", waited);
-        }
-        else
-        {
-            APP_PRINT_WARN1("wifi_connect: COMMAND READY not seen in %d ms, send anyway",
-                            waited);
-        }
+        os_delay(AI_REC_WIFI_READY_POLL_MS);
+        waited += AI_REC_WIFI_READY_POLL_MS;
+    }
+    bool ready = app_wifi_uart_module_is_ready();
+    if (ready)
+    {
+        APP_PRINT_INFO1("wifi_power_on: module COMMAND READY after %d ms", waited);
+        /* COMMAND READY only marks the banner printed; the COM8 logs show a first
+         * AT right after it can still get no response. Keep a settle so a later
+         * CMD_WIFI_CONNECT's ATPN lands on a fully-idle module. */
+        os_delay(AI_REC_WIFI_BRINGUP_SETTLE_MS);
+    }
+    else
+    {
+        APP_PRINT_WARN1("wifi_power_on: COMMAND READY not seen in %d ms", waited);
     }
 
-    /* COMMAND READY only marks that the boot banner printed; the COM8 logs show
-     * ATPN can still get no response if issued right after it (the proven
-     * phone-driven flow waited far longer). Keep a settle after the banner. */
-    os_delay(AI_REC_WIFI_BRINGUP_SETTLE_MS);
-
-    if (ai_rec_trans.wifi_state != WIFI_STATE_CONNECTING)
-    {
-        APP_PRINT_INFO1("wifi_connect: bring-up done but state=%d, drop connect",
-                        ai_rec_trans.wifi_state);
-        /* CMD_WIFI_CONNECT lifecycle ends here without a terminal AT
-         * callback - re-enable DLPS so we don't leak it disabled. */
-        app_dlps_enable(APP_DLPS_ENTER_CHECK_INIT);
-        return;
-    }
-
-    APP_PRINT_INFO1("wifi_connect: bring-up done, flag=%d, posting ATPN to app task",
-                    wifi_enable_flag);
-
-    /* Do NOT send ATPN here on the WiFi task. The cold-start connect failure
-     * (COM8 logs) was isolated to the send TASK CONTEXT: the identical ATPN
-     * sent from the WiFi task gets zero response from the module, while the
-     * proven phone-driven 0x8440 demo - which sends from the main app task -
-     * works every time (all other factors: \r\n, timing, DLPS, SDIO bring-up,
-     * wifi_power_on(), wifi_enable_flag, are byte/sequence identical). So hand
-     * the actual send off to the main app task (same context as the demo) via
-     * an IO message; ai_rec_trans_wifi_send_connect_deferred() runs it there. */
-    if (!app_wifi_uart_msg_send(IO_WIFI_UART_SEND_CONNECT, NULL))
-    {
-        APP_PRINT_ERROR0("wifi_connect: post ATPN-send msg to app task failed");
-        ai_rec_trans.wifi_state = WIFI_STATE_DISCONNECTED;
-        ai_rec_trans.wifi_connect_pending = false;
-        ai_rec_trans_send_wifi_connect_evt(WIFI_RESULT_HARDWARE_ERROR, 0, 0, 0);
-        /* No AT callback will fire - re-enable DLPS now. */
-        app_dlps_enable(APP_DLPS_ENTER_CHECK_INIT);
-    }
+    ai_rec_trans_wifi_power_on_finish(ready);
 }
 
 /** @brief Send the deferred ATPN connect. Registered with
@@ -1675,6 +1958,107 @@ static void ai_rec_trans_wifi_send_connect_deferred(void)
     }
 }
 #endif /* F_APP_WIFI_UART_CMD */
+
+#if F_APP_WIFI_SPI_CMD
+/** @brief Kick the 8711 TCP-server bring-up (AT+SKTCFG then AT+SKTSERVER).
+ *
+ *  Resets spi_tcp_setup_step and queues the two raw AT commands; the
+ *  AT_EVT_CMD_RESPONSE handler advances the step and, at step 2, inits the file
+ *  upload and sends EVT_WIFI_CONNECT. Shared by the normal GOT_IP path and the
+ *  auto-connect short-circuit in ai_rec_trans_handle_wifi_connect(). Caller must
+ *  have set wifi_state = WIFI_STATE_CONNECTED and wifi_ip first. */
+static void ai_rec_trans_spi_start_tcp_server(void)
+{
+    const wifi_transport_ops_t *tport = wifi_transport_get();
+    if (!tport)
+    {
+        return;
+    }
+    ai_rec_trans.spi_tcp_setup_step = 0;
+    char cmd_line[48];
+    tport->queue_fill(ATCMD_RAW, "AT+SKTCFG=,,1\r\n");
+    snprintf(cmd_line, sizeof(cmd_line),
+             "AT+SKTSERVER=0,1,,%u,1\r\n", (unsigned int)AI_REC_WIFI_TCP_PORT);
+    tport->queue_fill(ATCMD_RAW, cmd_line);
+    tport->trigger_send();
+}
+
+/** @brief wifi_8711-task trampoline: bring up the TCP server when CMD_WIFI_CONNECT
+ *  reuses the module's power-on auto-join. Runs async (like the GOT_IP path) so the
+ *  handler could return with state still CONNECTING and the dispatcher keeps DLPS
+ *  off until the SKT setup completes. Sets CONNECTED + starts the server here;
+ *  EVT_WIFI_CONNECT is emitted at SKT step 2. */
+static void ai_rec_trans_spi_reuse_autoconn_cb(void *p_arg)
+{
+    (void)p_arg;
+    if (ai_rec_trans.wifi_state != WIFI_STATE_CONNECTING)
+    {
+        /* A disconnect / cancel moved us out of CONNECTING before we ran. */
+        app_dlps_enable(APP_DLPS_ENTER_CHECK_INIT);
+        return;
+    }
+    ai_rec_trans.wifi_state = WIFI_STATE_CONNECTED;
+    ai_rec_trans.wifi_connect_pending = false;
+    ai_rec_trans.wifi_rssi  = 0;
+    ai_rec_trans_spi_start_tcp_server();
+}
+
+/** @brief (Re)arm the "ATCMD READY" boot-banner wait for the 8711. */
+static void ai_rec_trans_arm_wifi_ready_timer(void)
+{
+    app_stop_timer(&timer_id_wifi_ready);
+    app_start_timer(&timer_id_wifi_ready, "ai_rec_wifi_ready",
+                    ai_rec_trans_timer_id, AI_REC_TIMER_WIFI_READY, 0, false,
+                    AI_REC_WIFI_8711_READY_TIMEOUT_MS);
+}
+
+/** @brief wifi_8711-task trampoline for the ready-timeout path, so the power-on
+ *         finish runs on the same task as the AT_EVT_MODULE_READY handler (no
+ *         cross-task race on wifi_pwr_on_pending). Posted from the timer callback
+ *         via WIFI_8711_EVENT_USER_CB. Timeout => module not ready => finish(false). */
+static void ai_rec_trans_wifi_spi_ready_timeout_fire(void *p_arg)
+{
+    (void)p_arg;
+    ai_rec_trans_wifi_power_on_finish(false);
+}
+
+/**
+ * @brief CMD_WIFI_POWER_ON bring-up, executed on the wifi_8711 task.
+ *
+ *  Posted by ai_rec_trans_handle_wifi_power_on() so the module power-on never
+ *  blocks the BLE/GATT callback. Drives WIFI_EN (P0_0) high and arms the
+ *  ready-banner timeout, then RETURNS - it deliberately does NOT block waiting
+ *  for the module. The go-signal is the "ATCMD READY" banner, parsed on THIS same
+ *  wifi_8711 task and delivered as AT_EVT_MODULE_READY -> ai_rec_trans_wifi_power_on_finish(true);
+ *  a blocking wait here would deadlock that banner (RX can't be parsed while the
+ *  task is blocked). On timeout the trampoline above calls finish(false). */
+static void ai_rec_trans_wifi_spi_power_on_task(void *p_arg)
+{
+    (void)p_arg;
+
+    /* Re-sync the SPI stack BEFORE driving WIFI_EN high, so the receiver is clean
+     * and armed before the 8711 boots and asserts s2m with its "ATCMD READY"
+     * banner - "prepare the receiver, then turn on the transmitter". A prior
+     * upload session leaves the SPI master pump non-idle (master_idle / rx slots /
+     * tx-buf semaphore / prefill ping-pong) and the AT parser mid-state; a WIFI_EN
+     * power-cycle alone does NOT reset either, so the rebooted module's banner is
+     * never received and the 2nd power-on times out (0x13). Order matters:
+     *   1. app_spi_atcmd_reset()  - clear the AT parser layer (in-flight cmd /
+     *                               SENDRAW / bulk / stale RX line / queued cmds)
+     *   2. app_spi_master_init()  - reset the SPI master pump + re-arm the s2m/m2s
+     *                               GPIO handshake (idempotent to re-call; the MCU
+     *                               SPI controller is not gated by WIFI_EN, so this
+     *                               is safe while the 8711 is still off)
+     * Doing this AFTER wifi_8711_power_on() would race the first s2m edge if the
+     * module boots faster than the re-init; doing it BEFORE removes that race. */
+    app_spi_atcmd_reset();
+    app_spi_master_init();
+
+    wifi_8711_power_on();                 /* WIFI_EN (P0_0/GPIOA0) high */
+    ai_rec_trans_arm_wifi_ready_timer();  /* 0x13 timeout if the banner never arrives */
+    APP_PRINT_INFO0("wifi_power_on(spi): SPI re-synced, 8711 powered, waiting for ATCMD READY");
+}
+#endif /* F_APP_WIFI_SPI_CMD */
 
 /**
  * @brief CMD_WIFI_CONNECT (0x0691) handler.
@@ -1760,13 +2144,58 @@ static void ai_rec_trans_handle_wifi_connect(uint8_t *p, uint16_t plen)
     /* ---------- Transport-specific AT command send ---------- */
 #if (F_APP_WIFI_UART_CMD || F_APP_WIFI_SPI_CMD)
     const wifi_transport_ops_t *tport = wifi_transport_get();
+
+    /* Power-on is now a separate command. CMD_WIFI_CONNECT requires the module
+     * to already be powered+ready (via CMD_WIFI_POWER_ON); otherwise reject with
+     * 0x17 so the host powers on first. This replaces the old cold-start bring-up
+     * that used to live here. */
+    if (!wifi_powered_on)
+    {
+        APP_PRINT_WARN0("wifi_connect: module not powered on -> 0x17");
+        ai_rec_trans.wifi_state = WIFI_STATE_POWERED_OFF;
+        ai_rec_trans.wifi_connect_pending = false;
+        ai_rec_trans_send_wifi_connect_evt(WIFI_RESULT_NOT_POWERED_ON, 0, 0, 0);
+        return;
+    }
+
 #if F_APP_WIFI_SPI_CMD
-    /* SPI path: AT+WLCONN=ssid,<ssid>,pw,<pwd> via SPI AT engine.
-     * The SPI AT engine handles the command asynchronously; the
-     * ai_rec_trans_wifi_atcmd_cb() callback drives the state machine
-     * forward on GOT_IP -> CONNECTED (single-step, no ATPS/ATPI). */
+    /* Auto-connect short-circuit: the 8711 already joined its saved AP during
+     * power-on (captured in the GOT_IP handler). Sending AT+WLCONN to an already-
+     * joined AP won't re-emit "wifi got ip", so the normal flow would stall in
+     * CONNECTING. Instead jump straight to TCP-server setup with the cached IP;
+     * the CMD_RESPONSE step handler emits EVT_WIFI_CONNECT at step 2.
+     * NOTE: assumes the phone's target AP is the one the module auto-joined (the
+     * record-pen has a single saved network); a mismatch would need WLDISCONN
+     * first, which is not handled here. */
+    if (wifi_spi_auto_connected)
+    {
+        wifi_spi_auto_connected = false;   /* consumed */
+        APP_PRINT_INFO1("wifi_connect(spi): reuse auto-connect, ip=0x%08x",
+                        ai_rec_trans.wifi_ip);
+        /* Keep state CONNECTING (set above) so the dispatcher tail keeps DLPS off;
+         * defer the server bring-up to the wifi_8711 task (async, same context as
+         * the GOT_IP path). The trampoline sets CONNECTED + starts SKTCFG/SKTSERVER;
+         * EVT_WIFI_CONNECT is emitted at step 2. */
+        T_WIFI_8711_MSG msg = {0};
+        msg.event  = WIFI_8711_EVENT_USER_CB;
+        msg.buf    = NULL;
+        msg.msg_cb = ai_rec_trans_spi_reuse_autoconn_cb;
+        if (!app_send_msg_to_wifi_8711_task(&msg))
+        {
+            APP_PRINT_ERROR0("wifi_connect(spi): post reuse-autoconn msg failed");
+            ai_rec_trans.wifi_state = WIFI_STATE_DISCONNECTED;
+            ai_rec_trans.wifi_connect_pending = false;
+            ai_rec_trans_send_wifi_connect_evt(WIFI_RESULT_HARDWARE_ERROR, 0, 0, 0);
+        }
+        return;
+    }
+
+    /* SPI path: module powered+ready but idle -> send AT+WLCONN directly (no
+     * task-context restriction for the SPI AT engine). The async
+     * ai_rec_trans_wifi_atcmd_cb() drives GOT_IP -> CONNECTED and emits the EVT. */
     char spi_param[AI_REC_WIFI_SSID_MAX + AI_REC_WIFI_PASS_MAX + 16];
     snprintf(spi_param, sizeof(spi_param), "ssid,%s,pw,%s\r\n", ssid, pass);
+
     if (!tport || !tport->queue_fill(ATCMD_WLCONN, spi_param))
     {
         ai_rec_trans.wifi_state = WIFI_STATE_DISCONNECTED;
@@ -1780,40 +2209,22 @@ static void ai_rec_trans_handle_wifi_connect(uint8_t *p, uint16_t plen)
      * on AT_EVT_WIFI_GOT_IP (see GOT_IP handler, #if F_APP_WIFI_SPI_CMD). */
 
 #elif F_APP_WIFI_UART_CMD
-    /* UART path: ATPN=<ssid>,<pwd> via UART AT engine.
-     * Cold-start bring-up defers the actual ATPN to the WiFi task;
-     * subsequent connects send immediately. */
+    /* UART path: ATPN=<ssid>,<pwd>. Module already powered+ready. The ATPN must
+     * be sent from the MAIN APP TASK (not the WiFi task - see COM8 analysis in
+     * ai_rec_trans_wifi_send_connect_deferred), so stash the param and hand the
+     * send to the app-task deferred callback via IO_WIFI_UART_SEND_CONNECT. */
+    (void)tport;
     char param[AI_REC_WIFI_SSID_MAX + AI_REC_WIFI_PASS_MAX + 6];
     snprintf(param, sizeof(param), "%s,%s\r\n", ssid, pass);
+    strncpy(wifi_pending_connect_param, param, sizeof(wifi_pending_connect_param) - 1);
+    wifi_pending_connect_param[sizeof(wifi_pending_connect_param) - 1] = '\0';
 
-    if (!wifi_powered_on)
+    if (!app_wifi_uart_msg_send(IO_WIFI_UART_SEND_CONNECT, NULL))
     {
-        wifi_task_ensure();
-        wifi_powered_on = true;
-
-        strncpy(wifi_pending_connect_param, param,
-                sizeof(wifi_pending_connect_param) - 1);
-        wifi_pending_connect_param[sizeof(wifi_pending_connect_param) - 1] = '\0';
-
-        T_WIFI_MSG msg = {0};
-        msg.event  = EVENT_USER_APP_DEFINE;
-        msg.msg_cb = ai_rec_trans_wifi_bringup_connect;
-        if (!app_send_msg_to_wifitask(&msg))
-        {
-            APP_PRINT_ERROR0("wifi_connect: post bring-up msg failed");
-            ai_rec_trans.wifi_state = WIFI_STATE_DISCONNECTED;
-            ai_rec_trans.wifi_connect_pending = false;
-            ai_rec_trans_send_wifi_connect_evt(WIFI_RESULT_HARDWARE_ERROR, 0, 0, 0);
-        }
-        return;
-    }
-
-    if (!ai_rec_trans_wifi_send_connect_cmd(param))
-    {
+        APP_PRINT_ERROR0("wifi_connect: post ATPN-send msg to app task failed");
         ai_rec_trans.wifi_state = WIFI_STATE_DISCONNECTED;
         ai_rec_trans.wifi_connect_pending = false;
         ai_rec_trans_send_wifi_connect_evt(WIFI_RESULT_HARDWARE_ERROR, 0, 0, 0);
-        return;
     }
     /* EVT emitted asynchronously by ai_rec_trans_wifi_atcmd_cb(). */
 #endif /* F_APP_WIFI_UART_CMD / F_APP_WIFI_SPI_CMD */
@@ -1843,11 +2254,17 @@ static void ai_rec_trans_handle_wifi_disconnect(uint8_t *p, uint16_t plen)
     APP_PRINT_INFO2("wifi_disconnect: flags=0x%02x state=%d",
                     flags, ai_rec_trans.wifi_state);
 
-    /* Already idle - report success idempotently. */
+    /* Already idle (or unpowered) - report success idempotently. Note: when
+     * POWERED_OFF we do NOT force the state to DISCONNECTED (that would falsely
+     * read as "powered, not connected"); leave it powered-off. */
     if (ai_rec_trans.wifi_state == WIFI_STATE_DISCONNECTED ||
-        ai_rec_trans.wifi_state == WIFI_STATE_FAIL)
+        ai_rec_trans.wifi_state == WIFI_STATE_FAIL ||
+        ai_rec_trans.wifi_state == WIFI_STATE_POWERED_OFF)
     {
-        ai_rec_trans.wifi_state = WIFI_STATE_DISCONNECTED;
+        if (ai_rec_trans.wifi_state == WIFI_STATE_FAIL)
+        {
+            ai_rec_trans.wifi_state = WIFI_STATE_DISCONNECTED;
+        }
         ai_rec_trans_send_wifi_disconnect_evt(WIFI_RESULT_SUCCESS);
         return;
     }
@@ -1920,6 +2337,167 @@ static void ai_rec_trans_handle_wifi_get_status(uint8_t *p, uint16_t plen)
     ai_rec_trans_send_wifi_status_evt();
 }
 
+/**
+ * @brief CMD_WIFI_POWER_ON (0x0697) handler. spec x7.2.
+ *
+ *  Powers the WiFi module and, once it signals ready (SPI "ATCMD READY" / SDIO
+ *  "COMMAND READY"), asynchronously replies EVT_WIFI_POWER_ON. The multi-second
+ *  bring-up runs on the WiFi task (never this BLE callback). Idempotent:
+ *  already-powered -> 0x15 immediately; a bring-up already in flight is ignored.
+ */
+static void ai_rec_trans_handle_wifi_power_on(uint8_t *p, uint16_t plen)
+{
+    (void)p;
+    (void)plen;   /* Byte0 Flags currently all Reserved */
+
+#if (F_APP_WIFI_UART_CMD || F_APP_WIFI_SPI_CMD)
+    if (wifi_powered_on)
+    {
+        /* Already up and ready. Report 0x01 SUCCESS (not 0x15): to the phone
+         * "already on" is equivalent to "powered on and ready", and the AudioConnect
+         * APK treats anything other than 0x01 as a power-on failure (it aborts and
+         * tears the WiFi flow down on 0x15/0x13 - see COM62/logcat 2026-09-04). Do
+         * NOT re-wait a banner (the boot banner is emitted once per power cycle). */
+        APP_PRINT_INFO0("wifi_power_on: already powered on -> 0x01 (report success)");
+        ai_rec_trans_send_wifi_power_on_evt(WIFI_RESULT_SUCCESS,
+                                            AI_REC_WIFI_INTERFACE);
+        return;
+    }
+    if (wifi_pwr_on_pending)
+    {
+        /* Bring-up already in flight (retried CMD_WIFI_POWER_ON) - the in-flight
+         * one will emit the EVT; drop this duplicate silently. */
+        APP_PRINT_INFO0("wifi_power_on: bring-up already pending");
+        return;
+    }
+
+    wifi_pwr_on_pending     = true;
+    ai_rec_trans.wifi_state = WIFI_STATE_POWERING_ON;   /* DLPS stays off, see dispatcher tail */
+
+#if F_APP_WIFI_SPI_CMD
+    {
+        /* 8711: power WIFI_EN + arm ready-timeout on the wifi_8711 task; the
+         * "ATCMD READY" banner (AT_EVT_MODULE_READY) completes it. */
+        T_WIFI_8711_MSG msg = {0};
+        msg.event  = WIFI_8711_EVENT_USER_CB;
+        msg.buf    = NULL;
+        msg.msg_cb = ai_rec_trans_wifi_spi_power_on_task;
+        if (!app_send_msg_to_wifi_8711_task(&msg))
+        {
+            APP_PRINT_ERROR0("wifi_power_on: post 8711 power-on msg failed");
+            wifi_pwr_on_pending     = false;
+            ai_rec_trans.wifi_state = WIFI_STATE_POWERED_OFF;
+            ai_rec_trans_send_wifi_power_on_evt(WIFI_RESULT_HARDWARE_ERROR, WIFI_IF_UNKNOWN);
+        }
+    }
+#elif F_APP_WIFI_UART_CMD
+    {
+        /* 8783GBF: blocking chip_en + SDIO bring-up + COMMAND READY poll runs on
+         * the WiFi task; ai_rec_trans_wifi_power_on_task() emits the EVT. */
+        wifi_task_ensure();
+        T_WIFI_MSG msg = {0};
+        msg.event  = EVENT_USER_APP_DEFINE;
+        msg.msg_cb = ai_rec_trans_wifi_power_on_task;
+        if (!app_send_msg_to_wifitask(&msg))
+        {
+            APP_PRINT_ERROR0("wifi_power_on: post power-on msg failed");
+            wifi_pwr_on_pending     = false;
+            ai_rec_trans.wifi_state = WIFI_STATE_POWERED_OFF;
+            ai_rec_trans_send_wifi_power_on_evt(WIFI_RESULT_HARDWARE_ERROR, WIFI_IF_UNKNOWN);
+        }
+    }
+#endif
+#else
+    /* No WiFi hardware on this board. */
+    ai_rec_trans_send_wifi_power_on_evt(WIFI_RESULT_NOT_SUPPORTED, WIFI_IF_UNKNOWN);
+#endif
+}
+
+/**
+ * @brief CMD_WIFI_POWER_OFF (0x0698) handler. spec x7.5.
+ *
+ *  Byte0 Flags: Bit0=Force (power off even if linked; disconnect first),
+ *               Bit1=Forget credential (informational - no persistent store yet).
+ *  Powers the module down (SPI WIFI_EN low / SDIO wifi_enable(false)); the reply
+ *  is near-synchronous (no banner wait).
+ */
+static void ai_rec_trans_handle_wifi_power_off(uint8_t *p, uint16_t plen)
+{
+    uint8_t flags  = (plen >= 1) ? p[0] : 0;
+    bool    force  = (flags & 0x01) != 0;
+    bool    forget = (flags & 0x02) != 0;   /* informational */
+    APP_PRINT_INFO2("wifi_power_off: flags=0x%02x state=%d",
+                    flags, ai_rec_trans.wifi_state);
+
+#if (F_APP_WIFI_UART_CMD || F_APP_WIFI_SPI_CMD)
+    /* Already off -> idempotent 0x15. */
+    if (!wifi_powered_on && !wifi_pwr_on_pending)
+    {
+        ai_rec_trans.wifi_state = WIFI_STATE_POWERED_OFF;
+        ai_rec_trans_send_wifi_power_off_evt(WIFI_RESULT_ALREADY_CONNECTED);
+        return;
+    }
+
+    // bool linked = (ai_rec_trans.wifi_state == WIFI_STATE_CONNECTING   ||
+    //                ai_rec_trans.wifi_state == WIFI_STATE_CONNECTED    ||
+    //                ai_rec_trans.wifi_state == WIFI_STATE_ATPS_PENDING ||
+    //                ai_rec_trans.wifi_state == WIFI_STATE_ATPI_PENDING ||
+    //                ai_rec_trans.wifi_state == WIFI_STATE_DISCONNECTING);
+
+    // /* Linked and not forced -> reject; host must CMD_WIFI_DISCONNECT first. */
+    // if (linked && !force)
+    // {
+    //     APP_PRINT_WARN0("wifi_power_off: still linked and Force=0 -> 0x18 busy");
+    //     ai_rec_trans_send_wifi_power_off_evt(WIFI_RESULT_BUSY);
+    //     return;
+    // }
+
+    /* Force with a live link: no explicit AT disconnect - cutting the module's
+     * power drops the association anyway, and a last-moment AT+WLDISCONN/ATWD
+     * would race the power-down. State is reset below regardless. */
+
+    /* Physical power-down: SPI drives WIFI_EN low; SDIO wifi_enable(false). */
+    const wifi_transport_ops_t *tport = wifi_transport_get();
+    if (tport && tport->power_down)
+    {
+        tport->power_down(true);
+    }
+
+    /* Reset all WiFi state to powered-off. */
+    wifi_powered_on              = false;
+    wifi_pwr_on_pending          = false;
+    ai_rec_trans.wifi_state      = WIFI_STATE_POWERED_OFF;
+    ai_rec_trans.wifi_ip         = 0;
+    ai_rec_trans.wifi_rssi       = 0;
+    ai_rec_trans.wifi_connect_pending = false;
+    if (forget)
+    {
+        ai_rec_trans.wifi_ssid[0] = '\0';   /* informational: clear runtime SSID */
+    }
+    /* Deinit the file-upload module so a mid-transfer s_state / open fs_handle
+     * from this session doesn't leak into the next power-on -> connect (else the
+     * next upload can be rejected as busy or a file handle is leaked). */
+#if F_APP_WIFI_SPI_CMD
+    spi_file_upload_deinit();
+    app_stop_timer(&timer_id_wifi_ready);
+    wifi_spi_auto_connected = false;
+    /* Clear leftover AT-engine state (in-flight cmd / SENDRAW / bulk / stale RX)
+     * from this session so the NEXT power-on's "ATCMD READY" banner parses clean. */
+    app_spi_atcmd_reset();
+#elif F_APP_WIFI_UART_CMD
+    wifi_file_upload_deinit();
+#endif
+
+    /* WiFi is off - undo the 500ms coexistence widening so BLE is snappy again. */
+    ai_rec_trans_restore_ble_conn_interval();
+
+    ai_rec_trans_send_wifi_power_off_evt(WIFI_RESULT_SUCCESS);
+#else
+    (void)force; (void)forget;
+    ai_rec_trans_send_wifi_power_off_evt(WIFI_RESULT_SUCCESS);
+#endif
+}
+
 /*============================================================================*
  *                              Upload flow - open / cleanup
  *============================================================================*/
@@ -1961,6 +2539,7 @@ static void ai_rec_trans_close_and_reset(T_AI_REC_TRANS_STATE final_state)
     ai_rec_trans.live_filename[0]    = '\0';
 
     ai_rec_trans.conn_update_pending     = false;
+    ai_rec_trans.conn_update_polls       = 0;
 
     /* Eventual stable state: IDLE if normal cleanup, otherwise the
      * caller-specified terminal (CANCELED / ERROR / DONE). */
@@ -2073,9 +2652,44 @@ static void ai_rec_trans_apply_fast_conn_params(void)
     /* Mark the update as pending so push_chunks_burst() waits for it
      * to complete before sending the first data chunk. Prevents the
      * "stuck GATT notification" scenario where a notification queued
-     * during the connection update procedure never completes. */
+     * during the connection update procedure never completes.
+     * The wait is bounded - see AI_REC_CONN_UPDATE_MAX_POLLS. */
     ai_rec_trans.conn_update_pending = true;
+    ai_rec_trans.conn_update_polls   = 0;
 }
+
+#if (F_APP_WIFI_UART_CMD || F_APP_WIFI_SPI_CMD)
+/**
+ * @brief  Restore a fast BLE connection interval after WiFi is torn down.
+ *
+ *  The WiFi-coexistence path widens the BLE interval to 500 ms (see the SKT
+ *  step-2 / on-link-up connect handlers) so BLE events are sparse enough for
+ *  WiFi to drain its Tx BDs. Once WiFi is disconnected or powered off that
+ *  widening is no longer needed and leaves BLE sluggish (~500 ms latency per
+ *  CMD/EVT), so request the fast interval again. Unlike
+ *  ai_rec_trans_apply_fast_conn_params() this does NOT set conn_update_pending
+ *  (no upload data pacing here). Best-effort; the phone may accept or reject. */
+static void ai_rec_trans_restore_ble_conn_interval(void)
+{
+    if (ai_rec_trans.chann_type != GAP_CHANN_TYPE_LE_ATT &&
+        ai_rec_trans.chann_type != GAP_CHANN_TYPE_LE_ECFC)
+    {
+        return;  /* not LE; nothing to tune */
+    }
+    extern void ble_set_prefer_conn_param(uint8_t conn_id,
+                                          uint16_t min_interval,
+                                          uint16_t max_interval,
+                                          uint16_t latency,
+                                          uint16_t supervision_timeout);
+    ble_set_prefer_conn_param(ai_rec_trans.conn_id,
+                              AI_REC_CONN_INTERVAL_MIN,
+                              AI_REC_CONN_INTERVAL_MAX,
+                              AI_REC_CONN_LATENCY,
+                              AI_REC_CONN_SUPERVISION_TIMEOUT);
+    APP_PRINT_INFO2("ai_rec_trans: restore BLE CI %d-%d after WiFi teardown",
+                    AI_REC_CONN_INTERVAL_MIN, AI_REC_CONN_INTERVAL_MAX);
+}
+#endif
 
 /**
  * @brief  Handle CMD_UPLOAD_FILE (0x694). Validates input, opens file,
@@ -2094,9 +2708,10 @@ static void ai_rec_trans_apply_fast_conn_params(void)
  */
 static void ai_rec_trans_handle_upload_file(uint8_t *p, uint16_t plen)
 {
-    if (ai_rec_trans.state != AI_REC_TRANS_IDLE)
+    if (ai_rec_trans.state != AI_REC_TRANS_IDLE || s_scan.active)
     {
-        APP_PRINT_WARN1("upload_file: bad state %d", ai_rec_trans.state);
+        APP_PRINT_WARN2("upload_file: busy (state=%d scan=%d)",
+                        ai_rec_trans.state, s_scan.active);
         ai_rec_trans_send_upload_error(UPLOAD_ERR_PERMISSION);
         return;
     }
@@ -2652,23 +3267,41 @@ static void ai_rec_trans_send_batch(void)
         }
     }
 
-    /* ...... Defer until the fast-conn-param update completes ...... */
+    /* ...... Defer until the fast-conn-param update completes ......
+     *
+     *  Bounded wait: ble_set_prefer_conn_param() is a request, not a
+     *  command - the central may reject it and hold the interval where it
+     *  is (notably after the WiFi-coexistence path widened it to 500 ms).
+     *  Give up after AI_REC_CONN_UPDATE_MAX_POLLS and stream at whatever
+     *  the link negotiated; slow beats not transferring at all. */
     if (ai_rec_trans.conn_update_pending)
     {
         uint16_t interval = 0;
         le_get_conn_param(GAP_PARAM_CONN_INTERVAL, &interval,
                           ai_rec_trans.conn_id);
         if (interval >= AI_REC_CONN_INTERVAL_MIN &&
-            interval <= AI_REC_CONN_INTERVAL_MAX)
+            interval <= 0x32)
         {
             ai_rec_trans.conn_update_pending = false;
             APP_PRINT_INFO1("send_batch: conn_update done, interval=%d",
                             interval);
         }
+        else if (++ai_rec_trans.conn_update_polls >=
+                 AI_REC_CONN_UPDATE_MAX_POLLS)
+        {
+            ai_rec_trans.conn_update_pending = false;
+            APP_PRINT_WARN1("send_batch: conn_update rejected/timeout, "
+                            "streaming at interval=%d", interval);
+        }
         else
         {
             APP_PRINT_INFO1("send_batch: conn_update pending, "
                             "curr_interval=%d", interval);
+            /* Deliberately NOT re-arming the watchdog here: it was armed
+             * once when the upload opened and must keep counting down
+             * across these no-progress polls.  Re-arming it on every poll
+             * would reset the 10 s abort every 50 ms and the upload could
+             * never time out. */
             ai_rec_trans_arm_timer_ms(AI_REC_CONN_UPDATE_POLL_MS);
             return;
         }
@@ -2753,6 +3386,13 @@ void ai_rec_trans_notify_send_complete(uint16_t service_id)
         ai_rec_trans_arm_watchdog();
         ai_rec_trans_send_batch();
     }
+    else if (s_scan.active)
+    {
+        /* Credit-gated scan upload: a credit was replenished, pump more
+         * EVT_SCAN_FILES frames (START / ENTRY / END). */
+        ai_rec_trans_arm_watchdog();
+        ai_rec_trans_scan_pump();
+    }
 }
 
 /*============================================================================*
@@ -2792,14 +3432,51 @@ static void ai_rec_trans_timeout_cb(uint8_t timer_evt, uint16_t param)
     case AI_REC_TIMER_TRANS_WATCHDOG:
         APP_PRINT_WARN0("ai_rec_trans: watchdog fired, abort");
         app_stop_timer(&timer_id_trans_watchdog);
-        if (ai_rec_trans.state == AI_REC_TRANS_TRANSFERRING ||
-            ai_rec_trans.state == AI_REC_TRANS_OPEN ||
-            ai_rec_trans.state == AI_REC_TRANS_VERIFY)
+        if (s_scan.active)
+        {
+            /* Scan stalled (e.g. a lost SEND_DATA_COMPLETE). If START was
+             * already sent, close the sequence with a best-effort END; then
+             * release the session so the next scan/upload is not blocked. */
+            if (s_scan.start_sent)
+            {
+                ai_rec_trans_send_scan_end(s_scan.emitted);
+            }
+            s_scan.active = false;
+        }
+        else if (ai_rec_trans.state == AI_REC_TRANS_TRANSFERRING ||
+                 ai_rec_trans.state == AI_REC_TRANS_OPEN ||
+                 ai_rec_trans.state == AI_REC_TRANS_VERIFY)
         {
             ai_rec_trans_send_upload_error(UPLOAD_ERR_TRANSPORT);
             ai_rec_trans_close_and_reset(AI_REC_TRANS_ERROR);
         }
         break;
+
+#if F_APP_WIFI_SPI_CMD
+    case AI_REC_TIMER_WIFI_READY:
+        /* The 8711 never sent its "ATCMD READY" banner within the window during a
+         * CMD_WIFI_POWER_ON bring-up. Finish the power-on as a timeout (EVT 0x13).
+         * Route it through the wifi_8711 task so the finish runs on the same
+         * context as the AT_EVT_MODULE_READY handler (no cross-task race on
+         * wifi_pwr_on_pending). */
+        app_stop_timer(&timer_id_wifi_ready);
+        if (wifi_pwr_on_pending)
+        {
+            APP_PRINT_WARN0("wifi_power_on(spi): ATCMD READY timeout -> EVT 0x13");
+            T_WIFI_8711_MSG msg = {0};
+            msg.event  = WIFI_8711_EVENT_USER_CB;
+            msg.buf    = NULL;
+            msg.msg_cb = ai_rec_trans_wifi_spi_ready_timeout_fire;
+            if (!app_send_msg_to_wifi_8711_task(&msg))
+            {
+                /* Task queue post failed - finish inline so the host is not left
+                 * waiting forever (finish() only touches shared state + notify). */
+                APP_PRINT_ERROR0("wifi_power_on(spi): post ready-timeout msg failed");
+                ai_rec_trans_wifi_power_on_finish(false);
+            }
+        }
+        break;
+#endif
 
     default:
         break;
@@ -2935,6 +3612,16 @@ T_APP_RESULT app_ai_record_file_handle_cp_req(uint8_t conn_id, uint16_t conn_han
         ai_rec_trans_handle_wifi_get_status(p, plen);
         break;
 
+    case CMD_WIFI_POWER_ON:
+        ai_rec_trans_handle_wifi_power_on(p, plen);
+        break;
+
+    case CMD_WIFI_POWER_OFF:
+        pm_cpu_freq_set(40, &actual_mhz);
+        app_bt_policy_enter_pairing_mode(false, true);
+        ai_rec_trans_handle_wifi_power_off(p, plen);
+        break;
+
     default:
         APP_PRINT_WARN1("unknown cmd_id 0x%04x", cmd_id);
         ai_rec_trans_send_simple_resp(cmd_id, 0x02);
@@ -2951,6 +3638,7 @@ T_APP_RESULT app_ai_record_file_handle_cp_req(uint8_t conn_id, uint16_t conn_han
         ai_rec_trans.wifi_state != WIFI_STATE_ATPS_PENDING &&
         ai_rec_trans.wifi_state != WIFI_STATE_ATPI_PENDING &&
         ai_rec_trans.wifi_state != WIFI_STATE_DISCONNECTING &&
+        ai_rec_trans.wifi_state != WIFI_STATE_POWERING_ON &&
         ai_rec_trans.state != AI_REC_TRANS_OPEN &&
         ai_rec_trans.state != AI_REC_TRANS_TRANSFERRING &&
         ai_rec_trans.state != AI_REC_TRANS_VERIFY
@@ -2975,6 +3663,11 @@ void app_ai_record_file_trans_init(void)
 {
     memset(&ai_rec_trans, 0, sizeof(ai_rec_trans));
     ai_rec_trans.state = AI_REC_TRANS_IDLE;
+#if (F_APP_WIFI_UART_CMD || F_APP_WIFI_SPI_CMD)
+    /* WiFi starts unpowered - power-on is now an explicit CMD_WIFI_POWER_ON.
+     * (0x00=DISCONNECTED would wrongly read as "powered, not connected".) */
+    ai_rec_trans.wifi_state = WIFI_STATE_POWERED_OFF;
+#endif
     if (ai_rec_trans_timer_id == 0)
     {
         app_timer_reg_cb(ai_rec_trans_timeout_cb, &ai_rec_trans_timer_id);
@@ -2998,9 +3691,9 @@ void app_ai_record_file_trans_init(void)
 #endif
 
 #if F_APP_WIFI_UART_CMD
-    /* Send the cold-start ATPN from the main app task (this callback runs there
-     * via IO_WIFI_UART_SEND_CONNECT), matching the proven 0x8440 demo context
-     * instead of the WiFi task. See ai_rec_trans_wifi_send_connect_deferred(). */
+    /* CMD_WIFI_CONNECT sends its ATPN from the main app task (this callback runs
+     * there via IO_WIFI_UART_SEND_CONNECT), matching the proven 0x8440 demo
+     * context instead of the WiFi task. See ai_rec_trans_wifi_send_connect_deferred(). */
     app_wifi_uart_deferred_connect_register(ai_rec_trans_wifi_send_connect_deferred);
 #endif
 
@@ -3011,7 +3704,8 @@ bool app_ai_record_file_trans_is_busy(void)
 {
     return (ai_rec_trans.state == AI_REC_TRANS_TRANSFERRING ||
             ai_rec_trans.state == AI_REC_TRANS_OPEN ||
-            ai_rec_trans.state == AI_REC_TRANS_VERIFY);
+            ai_rec_trans.state == AI_REC_TRANS_VERIFY ||
+            s_scan.active);
 }
 
 void app_ai_record_file_trans_cancel(void)
@@ -3021,6 +3715,21 @@ void app_ai_record_file_trans_cancel(void)
         ai_rec_trans_send_upload_error(UPLOAD_ERR_TRANSPORT);
         ai_rec_trans_close_and_reset(AI_REC_TRANS_CANCELED);
     }
+}
+
+void app_ai_record_wifi_power_off_from_tcp(const uint8_t *body, uint16_t blen)
+{
+#if (F_APP_WIFI_UART_CMD || F_APP_WIFI_SPI_CMD)
+    /* Reuse the BLE-path power-off handler: it powers the module down, resets
+     * state, restores the BLE conn interval, and sends EVT_WIFI_POWER_OFF over
+     * the (still-alive) BLE notify channel. See the header note re Force + the
+     * ack going over BLE rather than the torn-down TCP socket. */
+    APP_PRINT_INFO1("wifi_power_off: via TCP channel, blen=%d", blen);
+    ai_rec_trans_handle_wifi_power_off((uint8_t *)body, blen);
+#else
+    (void)body;
+    (void)blen;
+#endif
 }
 
 void app_ai_record_file_trans_on_cccd(uint8_t conn_id, uint16_t conn_handle,
@@ -3040,6 +3749,14 @@ void app_ai_record_file_trans_on_cccd(uint8_t conn_id, uint16_t conn_handle,
          * next session must re-handshake before any upload. */
         ai_rec_trans.query_info_received = false;
         APP_PRINT_INFO0("on_cccd: notify disabled, query_info handshake cleared");
+
+        /* Release any in-flight scan session (its Notify channel is gone). */
+        if (s_scan.active)
+        {
+            APP_PRINT_WARN0("ai_rec_trans: notify disabled mid-scan, release");
+            s_scan.active = false;
+            ai_rec_trans_disarm_watchdog();
+        }
 
         if (app_ai_record_file_trans_is_busy())
         {

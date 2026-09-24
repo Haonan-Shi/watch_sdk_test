@@ -828,7 +828,17 @@ static void process_error_event(void)
 
 static void process_unsolicited_msg(char *p_param, uint16_t len)
 {
-    if (strstr(p_param, "wifi got ip"))
+    if (strstr(p_param, "ATCMD READY"))
+    {
+        /* 8711 boot banner. The module finished booting and its AT engine can
+         * now accept commands over SPI. This is the real go-signal for the first
+         * AT+WLCONN (the connect path used to blind-wait ~2s, which raced the
+         * ~7s cold boot and dropped the command). Surface it as a dedicated event
+         * so the connect state machine can fire AT+WLCONN exactly on ready. */
+        APP_PRINT_INFO0("[wifi] module boot banner: ATCMD READY");
+        notify_at_evt(AT_EVT_MODULE_READY, NULL, 0);
+    }
+    else if (strstr(p_param, "wifi got ip"))
     {
         process_got_ip_event(p_param);
     }
@@ -1388,6 +1398,37 @@ uint32_t app_spi_atcmd_rx_bytes_get(void)
 void app_spi_atcmd_rx_bytes_stop(void)
 {
     s_rx_count_en = false;
+}
+
+void app_spi_atcmd_reset(void)
+{
+    /* Return the AT engine to a clean idle state so a rebooted 8711's first
+     * output (the "ATCMD READY" boot banner) is parsed as an unsolicited line
+     * and NOT misrouted by state left over from a previous power-on session:
+     * an in-flight command (cur_cmd), a half-done AT+SKTSENDRAW (sendraw phase),
+     * bulk/stream/throughput mode still enabled, a partially buffered RX line, or
+     * queued-but-unsent AT commands. The task, queue handle and registered
+     * callbacks are left intact; only the transient state machine is cleared.
+     * Call this on WiFi power-off / before power-on. */
+    app_stop_timer(&timer_handle_atcmd_resend);
+    spi_atcmd_queue_flush(at_cmd_queue.count);   /* drop any pending AT commands */
+
+    at_cmd_t.cur_cmd    = ATCMD_NUM;
+    at_cmd_t.resend_cnt = 0;
+    at_cmd_t.rx_cnt     = 0;
+
+    s_sendraw_phase     = SENDRAW_IDLE;
+    s_sendraw_bulk_mode = false;
+    s_sendraw_stream    = false;
+    s_sendraw_data      = NULL;
+    s_sendraw_len       = 0;
+    s_stream_total      = 0;
+
+    s_rx_count_en       = false;
+    s_rx_payload_bytes  = 0;
+    s_rx_frame_cnt      = 0;
+
+    APP_PRINT_INFO0("[wifi] app_spi_atcmd_reset: AT engine state cleared");
 }
 
 void app_spi_atcmd_init(void)

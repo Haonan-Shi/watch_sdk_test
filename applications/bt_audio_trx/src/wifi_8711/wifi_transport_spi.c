@@ -9,6 +9,7 @@
 #include "wifi_transport.h"
 #include "app_spi_atcmd.h"
 #include "spi_file_upload.h"
+#include "wifi_8711_app.h"
 
 static bool _spi_register_cb(wifi_at_evt_cb_t cb)
 {
@@ -47,12 +48,17 @@ static void _spi_file_upload_restore_clk(void)
 
 static void _spi_power_on(void)
 {
-    /* SPI IC power is handled by wifi_8711_app.c */
+    /* Drive WIFI_EN (P0_0) high to power the 8711. Fast/non-blocking; the caller
+     * must allow the module ~2s to boot before the first AT command. */
+    wifi_8711_power_on();
 }
 
 static void _spi_power_down(bool disable)
 {
-    (void)disable;
+    if (disable)
+    {
+        wifi_8711_power_down();
+    }
 }
 
 const wifi_transport_ops_t g_spi_transport =

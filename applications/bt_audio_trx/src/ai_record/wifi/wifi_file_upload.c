@@ -865,6 +865,18 @@ static uint16_t on_tcp_rx(void *p_data, uint16_t len)
     case WIFI_UPLOAD_CMD_SCAN_FILES:
         handle_scan_files(body, blen, peer_ip, peer_pt);
         break;
+    case WIFI_UPLOAD_CMD_WIFI_POWER_OFF:
+        /* WiFi power-off arrived over the TCP data channel. Route to the shared
+         * BLE-path power-off (powers the 8783GBF down via wifi_enable(false) +
+         * resets state + restores the BLE interval + sends EVT_WIFI_POWER_OFF over
+         * BLE). The ack is NOT sent over TCP because the power-off tears this
+         * socket down. Defined in ai_record/app_ai_record_file_trans.c. */
+        {
+            extern void app_ai_record_wifi_power_off_from_tcp(const uint8_t *body,
+                                                              uint16_t blen);
+            app_ai_record_wifi_power_off_from_tcp(body, blen);
+        }
+        break;
     default:
         APP_PRINT_WARN1("[wifi_upload] unknown cmd 0x%04x", cmd_id);
         break;

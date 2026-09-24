@@ -1,0 +1,12 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+config TINYML_APP_KWS
+	bool "Keyword spotting"
+	help
+	  Offline streaming keyword-spotting demo driven by a static PCM clip.
+	  The clip is fed through a mel feature frontend (libkws_feature) and a
+	  streaming wake-word model on the shared ts_realtek engine.
