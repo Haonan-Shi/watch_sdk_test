@@ -45,7 +45,7 @@ manifest:
     path: zephyrproject/modules/lvgl
   - name: hal_realtek
     repo-path: zephyr-hal
-    revision: fc1390c8b5956370106be3e00bc6e56a5993c2f3
+    revision: 1cdc28daf06b8d127080fca39d0ec9f277923fbc
     path: zephyrproject/modules/hal/realtek
   - name: display
     repo-path: display
