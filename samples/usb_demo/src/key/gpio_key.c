@@ -8,11 +8,11 @@
 /*============================================================================*
  *                              Header Files
  *============================================================================*/
+#include <zephyr/device.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/kernel.h>
+#include <zephyr/dt-bindings/gpio/realtek-rtl87x3g-gpio.h>
 #include "trace.h"
-#include "section.h"
-#include "rtl876x_pinmux.h"
-#include "hal_gpio.h"
-#include "hal_gpio_int.h"
 #include "app_usb_hid.h"
 #include "app_io_msg.h"
 
@@ -34,7 +34,16 @@
 #define KEY_HIGH_ACTIVE_EN  0
 #endif
 
-#define GPIO_DEMO_INPUT_PIN0                      P1_0
+/* Demo key: P1_0, which is pad 8 = GPIOA7 (see hal pin_def.h) */
+#define KEY_GPIO_NODE                             DT_NODELABEL(gpioa)
+#define KEY_GPIO_PIN                              7
+#define KEY_DEBOUNCE_MS                           30
+
+#if KEY_HIGH_ACTIVE_EN
+#define KEY_GPIO_FLAGS      (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)
+#else
+#define KEY_GPIO_FLAGS      (GPIO_ACTIVE_LOW | GPIO_PULL_UP)
+#endif
 
 typedef enum
 {
@@ -47,6 +56,18 @@ typedef enum
 
 
 /** @} */ /* End of group Gpio_Interrupt_Exported_Macros */
+
+/*============================================================================*
+ *                              Variables
+ *============================================================================*/
+static const struct gpio_dt_spec key_input =
+{
+    .port = DEVICE_DT_GET(KEY_GPIO_NODE),
+    .pin  = KEY_GPIO_PIN,
+    .dt_flags = KEY_GPIO_FLAGS | RTL87X3G_GPIO_INPUT_DEBOUNCE_MS(KEY_DEBOUNCE_MS),
+};
+
+static struct gpio_callback key_gpio_cb;
 
 /*============================================================================*
  *                              Functions
@@ -131,28 +152,28 @@ void app_key_handle_msg(T_IO_MSG *io_driver_msg_recv)
 }
 #endif
 
-ISR_TEXT_SECTION
-static void gpio_isr_cb(uint32_t context)
+static void gpio_isr_cb(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
-    uint8_t pin_index = (uint32_t)context;
-    T_GPIO_LEVEL gpio_level = hal_gpio_get_input_level(pin_index);
+    ARG_UNUSED(dev);
+    ARG_UNUSED(cb);
+    ARG_UNUSED(pins);
 
-    IO_PRINT_INFO2("gpio_isr_cb: pin_name %s, gpio_level %d", TRACE_STRING(Pad_GetPinName(pin_index)),
-                   gpio_level);
+    /* logical level: 1 means active (pressed), the active polarity is taken
+     * from key_input.dt_flags
+     */
+    int pressed = gpio_pin_get_dt(&key_input);
 
-    if (gpio_level == GPIO_LEVEL_LOW)
-    {
-        hal_gpio_irq_change_polarity(pin_index, GPIO_IRQ_ACTIVE_HIGH);
-    }
-    else
-    {
-        hal_gpio_irq_change_polarity(pin_index, GPIO_IRQ_ACTIVE_LOW);
-    }
-#if KEY_HIGH_ACTIVE_EN
-    if (gpio_level == GPIO_LEVEL_HIGH)
-#else
-    if (gpio_level == GPIO_LEVEL_LOW)
-#endif
+    IO_PRINT_INFO2("gpio_isr_cb: pin %d, pressed %d", key_input.pin, pressed);
+
+    /* The rtl87x3g gpio driver has no both edge trigger, so keep following the
+     * current level with a single edge trigger.
+     */
+    gpio_flags_t next_trig = (pressed > 0) ? GPIO_INT_EDGE_TO_INACTIVE
+                             : GPIO_INT_EDGE_TO_ACTIVE;
+
+    gpio_pin_interrupt_configure_dt(&key_input, next_trig);
+
+    if (pressed > 0)
     {
         app_key_gpio_press();
     }
@@ -160,21 +181,38 @@ static void gpio_isr_cb(uint32_t context)
 
 void key_init(void)
 {
-    hal_gpio_init();
-    hal_gpio_int_init();
-    hal_gpio_set_debounce_time(30);
+    int ret;
 
-#if KEY_HIGH_ACTIVE_EN
-    hal_gpio_init_pin(GPIO_DEMO_INPUT_PIN0, GPIO_TYPE_CORE, GPIO_DIR_INPUT, GPIO_PULL_DOWN);
-    hal_gpio_set_up_irq(GPIO_DEMO_INPUT_PIN0, GPIO_IRQ_EDGE, GPIO_IRQ_ACTIVE_HIGH, true);
-    hal_gpio_register_isr_callback(GPIO_DEMO_INPUT_PIN0, gpio_isr_cb, GPIO_DEMO_INPUT_PIN0);
-    hal_gpio_irq_enable(GPIO_DEMO_INPUT_PIN0);
-#else
-    hal_gpio_init_pin(GPIO_DEMO_INPUT_PIN0, GPIO_TYPE_CORE, GPIO_DIR_INPUT, GPIO_PULL_UP);
-    hal_gpio_set_up_irq(GPIO_DEMO_INPUT_PIN0, GPIO_IRQ_EDGE, GPIO_IRQ_ACTIVE_LOW, true);
-    hal_gpio_register_isr_callback(GPIO_DEMO_INPUT_PIN0, gpio_isr_cb, GPIO_DEMO_INPUT_PIN0);
-    hal_gpio_irq_enable(GPIO_DEMO_INPUT_PIN0);
-#endif
+    if (!device_is_ready(key_input.port))
+    {
+        APP_PRINT_ERROR0("key_init: gpio device not ready");
+        return;
+    }
+
+    ret = gpio_pin_configure_dt(&key_input, GPIO_INPUT);
+    if (ret < 0)
+    {
+        APP_PRINT_ERROR1("key_init: pin configure failed %d", ret);
+        return;
+    }
+
+    gpio_init_callback(&key_gpio_cb, gpio_isr_cb, BIT(key_input.pin));
+
+    ret = gpio_add_callback(key_input.port, &key_gpio_cb);
+    if (ret < 0)
+    {
+        APP_PRINT_ERROR1("key_init: add callback failed %d", ret);
+        return;
+    }
+
+    ret = gpio_pin_interrupt_configure_dt(&key_input, GPIO_INT_EDGE_TO_ACTIVE);
+    if (ret < 0)
+    {
+        APP_PRINT_ERROR1("key_init: interrupt configure failed %d", ret);
+        return;
+    }
+
+    APP_PRINT_INFO1("key_init: done, gpio pin %d", key_input.pin);
 }
 
 #endif

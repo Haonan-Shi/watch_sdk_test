@@ -1,0 +1,19 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+# The four tinyml demos are mutually exclusive (each ships its own main() and
+# model), so they are exposed as a single-select choice.  Each app subdirectory
+# contributes its choice member via its own Kconfig (rsourced below).
+
+choice TINYML_APP
+	prompt "TinyML application to build"
+	default TINYML_APP_KWS
+	help
+	  Select which tinyml demo the firmware is built for.  Exactly one demo
+	  is compiled and linked; the others are excluded from the build.
+
+rsource "*/Kconfig"
+
+endchoice

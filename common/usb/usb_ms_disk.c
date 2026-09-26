@@ -47,6 +47,12 @@ void *usb_ms_disk_buffer_alloc(uint32_t blk_num)
 
     if (disk_access_ioctl(DISK_DRIVE_NAME, DISK_IOCTL_GET_ERASE_BLOCK_SZ, &blk_len) != 0) { return NULL; }
 
+    /* card_ioctl() reports block_size 0 for an uninitialized card without failing,
+     * so a zero length must be rejected here or a NULL buffer is handed to the
+     * MS driver and the first CBW transfer faults.
+     */
+    if (blk_len == 0) { return NULL; }
+
     return os_mem_zalloc(OS_MEM_TYPE_DATA, blk_num * blk_len);
 #else
 #if CONFIG_SOC_SERIES_RTL8763E
@@ -105,7 +111,11 @@ static int usb_ms_disk_write(uint32_t lba, uint32_t blk_num, uint8_t *data)
 
 static bool usb_ms_disk_is_ready(void)
 {
+#if defined(CONFIG_ZEPHYR_REALTEK_APP_MODULE)
+    return (disk_access_status(DISK_DRIVE_NAME) == DISK_STATUS_OK);
+#else
     return true;
+#endif
 }
 
 static int usb_ms_disk_capacity_get(uint32_t *max_lba, uint32_t *blk_len)
@@ -146,8 +156,20 @@ static T_DISK_DRIVER usb_ms_disk_driver =
 int usb_ms_disk_init(void)
 {
 #if defined(CONFIG_ZEPHYR_REALTEK_APP_MODULE)
+    if (disk_access_status(DISK_DRIVE_NAME) != DISK_STATUS_OK)
+    {
+        APP_PRINT_WARN1("usb_ms_disk_init: disk %s not ready", TRACE_STRING(DISK_DRIVE_NAME));
+        return -EIO;
+    }
+
     if (disk_access_ioctl(DISK_DRIVE_NAME, DISK_IOCTL_GET_ERASE_BLOCK_SZ,
                           &usb_ms_disk_driver.blk_size) != 0) { return -EIO; }
+
+    if (usb_ms_disk_driver.blk_size == 0)
+    {
+        APP_PRINT_WARN0("usb_ms_disk_init: blk_size 0");
+        return -EIO;
+    }
 #endif
 
     usb_ms_driver_disk_register((T_DISK_DRIVER *)&usb_ms_disk_driver);

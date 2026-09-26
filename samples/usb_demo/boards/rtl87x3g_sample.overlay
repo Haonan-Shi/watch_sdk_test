@@ -1,0 +1,12 @@
+/*
+ * Copyright (c) 2026, Realtek Semiconductor Corporation
+ *
+ * SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+ */
+
+/* gpioa is disabled by default in the board dts.
+ * src/key/gpio_key.c uses P1_0 (pad 8 = GPIOA7) as the demo key.
+ */
+&gpioa {
+	status = "okay";
+};

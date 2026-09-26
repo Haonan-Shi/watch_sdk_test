@@ -179,7 +179,6 @@ static void app_io_resource_cfg(void)
 void app_system_lower_init(void)
 {
     app_mpu_config();
-    sys_hall_auto_sleep_in_idle(false);
 #if !CONFIG_APP_NANDBOOT
     if (fmc_flash_try_high_speed_mode(FMC_SPIC_ID_0, FMC_FLASH_NOR_4_BIT_MODE))
     {

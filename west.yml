@@ -8,20 +8,36 @@ manifest:
   projects:
   - name: zephyr
     repo-path: zephyr
-    revision: dfa613d207b9234519ec93481812b3a09955bcee
-    path: zephyr
+    revision: 6088863e727cd5578989e65b1cabaf33810c76af
+    path: zephyrproject/zephyr
     west-commands: scripts/west-commands.yml
-    import:
-      file: test.yml
-      path-prefix: zephyrproject
-      name-allowlist:
-      - cmsis
-      - tinycrypt
-      - mbedtls
-      - fatfs
+  - name: cmsis
+    url: https://github.com/zephyrproject-rtos/cmsis.git
+    revision: 4b96cbb174678dcd3ca86e11e1f24bc5f8726da0
+    path: zephyrproject/modules/hal/cmsis
+    groups:
+    - hal
+  - name: fatfs
+    url: https://github.com/zephyrproject-rtos/fatfs.git
+    revision: 427159bf95ea49b7680facffaa29ad506b42709b
+    path: zephyrproject/modules/fs/fatfs
+    groups:
+    - fs
+  - name: mbedtls
+    url: https://github.com/zephyrproject-rtos/mbedtls.git
+    revision: a78176c6ff0733ba08018cba4447bd3f20de7978
+    path: zephyrproject/modules/crypto/mbedtls
+    groups:
+    - crypto
+  - name: tinycrypt
+    url: https://github.com/zephyrproject-rtos/tinycrypt.git
+    revision: 1012a3ebee18c15ede5efc8332ee2fc37817670f
+    path: zephyrproject/modules/crypto/tinycrypt
+    groups:
+    - crypto
   - name: honeygui
     repo-path: HoneyGUI
-    revision: 59c0bdd6a8466911de39225471f11a78cbc84309
+    revision: ebe9378874810fd86c239f1def9488878257be6f
     path: zephyrproject/modules/honeygui
   - name: lvgl
     repo-path: lvgl
@@ -29,11 +45,11 @@ manifest:
     path: zephyrproject/modules/lvgl
   - name: hal_realtek
     repo-path: zephyr-hal
-    revision: 1320586305c4f70456d211fd91c60d18b5bffbb7
+    revision: 97b1e4f3dde49a6c5e2332f7c62f60c6c0c03d5d
     path: zephyrproject/modules/hal/realtek
   - name: display
     repo-path: display
-    revision: add4f71655376ac3dc264dfcbcb3d65bf917275b
+    revision: 8a44eafb0e6a78952eaacbfe5ac106b80fdd373d
     path: zephyrproject/modules/display
   self:
     path: zephyrproject/realtek-app

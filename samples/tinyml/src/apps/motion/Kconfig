@@ -1,0 +1,13 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+config TINYML_APP_MOTION
+	bool "Motion recognition"
+	help
+	  TinyMotion 1D-CNN motion-trajectory recognition on a raw accelerometer
+	  window embedded in the firmware.  z-score + int8 quantization is done
+	  in plain C (motion_preprocess.c); the model runs on the shared
+	  ts_realtek engine with a confidence-threshold open-set gate.

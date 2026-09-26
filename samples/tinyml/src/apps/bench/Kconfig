@@ -1,0 +1,16 @@
+#
+# Copyright (c) 2026, Realtek Semiconductor Corporation
+#
+# SPDX-License-Identifier: LicenseRef-Realtek-5-Clause
+#
+
+config TINYML_APP_BENCH
+	bool "Benchmark (UART-streamed model)"
+	select SERIAL
+	select UART_INTERRUPT_DRIVEN
+	help
+	  Host-driven test harness: the model and input data are streamed in
+	  over the data UART (uart2) using a framed protocol, and results / RAM
+	  usage / operator lists / profiler traces are streamed back to the PC
+	  tool.  Requires the interrupt-driven UART and the uart2 node enabled
+	  by the board overlay.

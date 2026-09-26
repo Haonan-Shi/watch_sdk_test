@@ -48,15 +48,15 @@
 		#address-cells = <1>;
 		#size-cells = <1>;
 		/* first 1 MB split: 512 KB cacheable MCU + 512 KB reserved for DSP.
-		 * The DSP range is a bare reserved node (no memory-region, no MPU
-		 * config yet) so the MCU build simply never uses it. */
-		psram1_for_mcu: memory@24000000{
-			compatible = "zephyr,memory-region";
+		 * The DSP range may differ from applications and dsp firmwares.
+		   Please check the psram1_for_dsp node before porting to an application. */
+		psram1_for_dsp: memory@24000000{
 			reg = <0x24000000 DT_SIZE_K(512)>;
-			zephyr,memory-region = "PSRAM1_MCU";
 		};
-		psram1_for_dsp: memory@24080000{
+		psram1_for_mcu: memory@24080000{
+			compatible = "zephyr,memory-region";
 			reg = <0x24080000 DT_SIZE_K(512)>;
+			zephyr,memory-region = "PSRAM1_MCU";
 		};
 		psram1_nc: memory@24100000{
 			compatible = "zephyr,memory-region";
